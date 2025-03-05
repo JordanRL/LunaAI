@@ -3,7 +3,8 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime
 import uuid
 
-from domain.models.messages import MessageContent, Message
+from domain.models.messages import Message
+from domain.models.content import MessageContent
 
 
 @dataclass

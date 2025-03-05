@@ -7,7 +7,8 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from domain.models.conversation import Conversation
-from domain.models.messages import MessageContent, Message
+from domain.models.messages import Message
+from domain.models.content import MessageContent
 from services.user_service import UserService
 
 

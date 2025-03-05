@@ -10,7 +10,8 @@ import time
 from domain.models.agent import AgentResponse, AgentConfig
 from domain.models.routing import RoutingInstruction
 from domain.models.conversation import Conversation
-from domain.models.messages import MessageContent, Message
+from domain.models.messages import Message
+from domain.models.content import MessageContent
 from adapters.anthropic_adapter import AnthropicAdapter
 from anthropic.types import Message as AnthropicMessage
 from copy import deepcopy

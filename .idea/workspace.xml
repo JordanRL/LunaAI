@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="35398227-ce3f-4c02-9cd9-a0bd812d8726" name="Changes" comment="Refactor hub initialization and improve conversation handling.&#10;&#10;Added service dependencies to LunaHub for cleaner architecture and expanded the conversation handling logic to manage user-specific interactions. Simplified memory and user message processing, and updated the main function to reflect these changes. This improves modularity and readiness for further feature enhancements." />
+    <list default="true" id="35398227-ce3f-4c02-9cd9-a0bd812d8726" name="Changes" comment="Refactor `MessageContent` and `Message` into a new module.&#10;&#10;Extracted `MessageContent`, `Message`, and related logic from `domain.models.conversation` into a dedicated `domain.models.messages` module to improve code organization and resolve circular dependency." />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -53,7 +53,7 @@
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "//wsl.localhost/Ubuntu/home/jordan/Projects/Luna",
+    "last_opened_file_path": "//wsl.localhost/Ubuntu/home/jordan/Projects/AITest/domain/models/enums.py",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -136,7 +136,7 @@
       <workItem from="1740700532669" duration="55209000" />
       <workItem from="1740806990496" duration="95951000" />
       <workItem from="1741110233778" duration="667000" />
-      <workItem from="1741110919673" duration="23465000" />
+      <workItem from="1741110919673" duration="23978000" />
     </task>
     <task id="LOCAL-00001" summary="Add core architecture, tool registry, and specialized agents&#10;&#10;Introduced the foundational structure for Luna, including core modules, adapters, domain models, and agents. Added specialized tools for cognition and reflection, system prompts for various agent tasks, and implemented Anthropic API integration for agent communication. This lays the groundwork for Luna's agent-based functionality.">
       <option name="closed" value="true" />
@@ -154,7 +154,23 @@
       <option name="project" value="LOCAL" />
       <updated>1741159449076</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Refactor `AgentType` to a standalone `enums` module.&#10;&#10;Moved `AgentType` from `agent.py` to a new `enums.py` to resolve circular import error.">
+      <option name="closed" value="true" />
+      <created>1741159696411</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1741159696411</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Refactor `MessageContent` and `Message` into a new module.&#10;&#10;Extracted `MessageContent`, `Message`, and related logic from `domain.models.conversation` into a dedicated `domain.models.messages` module to improve code organization and resolve circular dependency.">
+      <option name="closed" value="true" />
+      <created>1741159979249</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1741159979249</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -163,7 +179,9 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Add core architecture, tool registry, and specialized agents&#10;&#10;Introduced the foundational structure for Luna, including core modules, adapters, domain models, and agents. Added specialized tools for cognition and reflection, system prompts for various agent tasks, and implemented Anthropic API integration for agent communication. This lays the groundwork for Luna's agent-based functionality." />
     <MESSAGE value="Refactor hub initialization and improve conversation handling.&#10;&#10;Added service dependencies to LunaHub for cleaner architecture and expanded the conversation handling logic to manage user-specific interactions. Simplified memory and user message processing, and updated the main function to reflect these changes. This improves modularity and readiness for further feature enhancements." />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor hub initialization and improve conversation handling.&#10;&#10;Added service dependencies to LunaHub for cleaner architecture and expanded the conversation handling logic to manage user-specific interactions. Simplified memory and user message processing, and updated the main function to reflect these changes. This improves modularity and readiness for further feature enhancements." />
+    <MESSAGE value="Refactor `AgentType` to a standalone `enums` module.&#10;&#10;Moved `AgentType` from `agent.py` to a new `enums.py` to resolve circular import error." />
+    <MESSAGE value="Refactor `MessageContent` and `Message` into a new module.&#10;&#10;Extracted `MessageContent`, `Message`, and related logic from `domain.models.conversation` into a dedicated `domain.models.messages` module to improve code organization and resolve circular dependency." />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor `MessageContent` and `Message` into a new module.&#10;&#10;Extracted `MessageContent`, `Message`, and related logic from `domain.models.conversation` into a dedicated `domain.models.messages` module to improve code organization and resolve circular dependency." />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/AITest$user.coverage" NAME="user Coverage Results" MODIFIED="1741146450496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/domain/models" />

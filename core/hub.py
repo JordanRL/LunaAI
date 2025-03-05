@@ -13,8 +13,8 @@ from adapters.console_adapter import ConsoleAdapter
 from config.settings import get_api_keys, get_app_config
 from core.agent import Agent
 from domain.models.agent import AgentResponse
-from domain.models.messages import MessageContent
-from domain.models.routing import RoutingInstruction, ToolResponse
+from domain.models.content import MessageContent, ToolResponse
+from domain.models.routing import RoutingInstruction
 from domain.models.tool import ToolRegistry
 from services.conversation_service import ConversationService
 from services.emotion_service import EmotionService
