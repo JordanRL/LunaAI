@@ -75,7 +75,8 @@ class LunaHub:
         """
         import os
         import json
-        from domain.models.agent import AgentConfig, AgentType
+        from domain.models.agent import AgentConfig
+        from domain.models.enums import AgentType
         from core.agent import Agent
         from adapters.anthropic_adapter import AnthropicAdapter
         

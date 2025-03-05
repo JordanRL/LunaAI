@@ -4,7 +4,7 @@ Routing tools for agent-to-agent communication.
 
 from typing import Dict, List, Any, Optional
 from domain.models.tool import Tool, ToolCategory
-from domain.models.agent import AgentType
+from domain.models.enums import AgentType
 from debug import debug_manager, DebugLevel, log, log_error
 
 

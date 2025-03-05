@@ -1,40 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
-from enum import Enum
 
-from domain.models.conversation import Message, MessageContent
+from domain.models.conversation import Message
+from domain.models.enums import AgentType
 from routing import RoutingInstruction, ToolCall
 from tool import Tool
-
-class AgentType(Enum):
-    """
-    Available agent types for routing.
-    """
-    DISPATCHER = "dispatcher"
-    MEMORY_RETRIEVER = "memory_retriever"
-    MEMORY_WRITER = "memory_writer"
-    EMOTION_PROCESSOR = "emotion_processor"
-    RELATIONSHIP_MANAGER = "relationship_manager"
-    INNER_THOUGHT = "inner_thought"
-    INSPECT_INTENTION = "inspect_intention"
-    PERSONA_EVOLUTION = "persona_evolution"
-    SUMMARIZER = "summarizer"
-    SELF_REFLECTION = "self_reflection"
-    OUTPUTTER = "outputter"
-
-    @classmethod
-    def to_list(cls) -> List[str]:
-        """Convert enum values to a list of strings."""
-        return [agent.value for agent in cls]
-
-    @classmethod
-    def filtered_to_list(cls) -> List[str]:
-        """
-        Convert enum values to a list of strings, excluding some specific agents.
-        This is useful for tools that should not route to certain agents.
-        """
-        exclude = ["dispatcher", "outputter", "persona_evolution"]
-        return [agent.value for agent in cls if agent.value not in exclude]
 
 @dataclass
 class AgentResponse:
