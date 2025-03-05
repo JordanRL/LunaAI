@@ -16,6 +16,9 @@ from domain.models.agent import AgentResponse
 from domain.models.conversation import MessageContent
 from domain.models.routing import RoutingInstruction, ToolResponse
 from domain.models.tool import ToolRegistry
+from services.conversation_service import ConversationService
+from services.emotion_service import EmotionService
+from services.user_service import UserService
 
 
 class LunaHub:
@@ -31,7 +34,10 @@ class LunaHub:
     
     def __init__(
             self,
-            console_adapter: Optional[ConsoleAdapter] = None,
+            console_adapter: ConsoleAdapter,
+            conversation_service: ConversationService,
+            emotion_service: EmotionService,
+            user_service: UserService,
     ):
         """
         Initialize the Luna hub system.
@@ -47,7 +53,13 @@ class LunaHub:
         self._load_tools()
         self._load_agents()
 
-        self.console_adapter = console_adapter or ConsoleAdapter()
+        # Adapters
+        self.console_adapter = console_adapter
+
+        # Services
+        self.conversation_service = conversation_service
+        self.emotion_service = emotion_service
+        self.user_service = user_service
 
         self.app_config = get_app_config()
 
@@ -170,10 +182,13 @@ class LunaHub:
 
     def _handle_command(self, user_message: str) -> bool:
         """
-
+        Handles basic commands.
         """
+        if user_message == "/exit" or user_message == "/quit":
+            return False
+        return True
 
-    def process_message(self, user_message: str) -> str:
+    def process_message(self, user_message: str, user_id: str) -> str:
         """
         Process a user message through the agent network.
         
@@ -184,29 +199,33 @@ class LunaHub:
         
         Args:
             user_message: The user's input message
+            user_id: The user's unique ID
             
         Returns:
             String with the final response
         """
+        commands = self._handle_command(user_message)
+
+        if not commands:
+            raise SystemExit("Time to quit. Goodbye!")
+
+        # Get conversation ID
+        conversation_id = self.conversation_service.get_conversation_id_by_user_id(user_id)
+        if not conversation_id:
+            conversation = self.conversation_service.create_conversation(user_id)
+            conversation_id = conversation.conversation_id
+
         # Store user message in conversation
-        self.conversation_service.add_user_message(self.conversation.conversation_id, user_message)
-        
-        # Retrieve relevant memories
-        relevant_memories = self.conversation_service.retrieve_related_memories(
-            self.conversation.conversation_id, 
-            user_message, 
-            limit=3
-        )
+        self.conversation_service.add_user_message(conversation_id, MessageContent.make_text(user_message))
         
         # Create context message for dispatcher
-        context_message = self._build_context_message(user_message, relevant_memories)
+        context_message = self._build_context_message(user_message, user_id)
         
         # Execute dispatcher agent
         dispatcher_response = self.execute_agent(
             agent_name="dispatcher",
             message=context_message,
-            conversation_history=self.conversation.to_api_messages(5),
-            textual=self.textual_app
+            conversation_history=self.conversation_service.get_conversation(conversation_id),
         )
         
         # Process routing instructions if any
@@ -226,11 +245,11 @@ class LunaHub:
             message=formatted_content
         )
         
-        final_response = outputter_response.content
+        final_response = outputter_response.message.content[-1]
         
         # Store assistant message in conversation
         self.conversation_service.add_assistant_message(
-            self.conversation.conversation_id, 
+            conversation_id,
             final_response
         )
         
@@ -238,15 +257,9 @@ class LunaHub:
         self.emotion_service.decay()
         
         # Update user interaction stats
-        self.user_service.update_interaction_stats(self.user_id)
+        self.user_service.update_interaction_stats(user_id)
         
-        # Check if summarization is needed
-        self.conversation_service.check_and_perform_summarization(self.conversation.conversation_id)
-        
-        # Store the interaction in memory
-        self._save_interaction_memory(user_message, final_response)
-        
-        return final_response
+        return outputter_response.message.get_text()
 
     def user_prompt(self):
         return Prompt(prompt="[bold cyan]You>[/bold cyan] ", console=self.console_adapter.console)
@@ -471,23 +484,18 @@ class LunaHub:
         
         return final_response
     
-    def _build_context_message(self, user_message: str, relevant_memories: List[Dict[str, Any]]) -> str:
+    def _build_context_message(self, user_message: str, user_id: str) -> str:
         """
         Build a context message for the dispatcher agent.
         
         Args:
             user_message: The user's message
-            relevant_memories: Relevant memories to include
             
         Returns:
             Formatted context message
         """
         # Format memories if available
         memories_formatted = ""
-        if relevant_memories:
-            memories_formatted = "## Related Memories\n\n"
-            for i, memory in enumerate(relevant_memories):
-                memories_formatted += f"Memory {i + 1}:\n{memory.get('content', '')}\n\n"
         
         # Create the context message
         context_message = f"""
@@ -495,10 +503,10 @@ class LunaHub:
         {user_message}
         
         ## User ID
-        {self.user_id}
+        {user_id}
         
         ## User Profile
-        {self.user_profile.to_dict()}
+        {self.user_service.get_user_profile(user_id).to_dict()}
         """
         
         # Add emotional state
@@ -539,41 +547,6 @@ class LunaHub:
         
         Please format this as a natural response from Luna to the user, maintaining her personality.
         """
-    
-    def _save_interaction_memory(self, user_message: str, assistant_response: str) -> None:
-        """
-        Save the current interaction to memory.
-        
-        Args:
-            user_message: The user message
-            assistant_response: Luna's response
-        """
-        # Format the interaction
-        interaction = f"User: {user_message}\n\nLuna: {assistant_response}"
-        
-        # Create basic importance heuristic based on content length
-        importance = min(5 + (len(user_message) + len(assistant_response)) // 500, 9)
-        
-        # Detect special conversations that might be more important
-        special_terms = ["remember", "important", "forget", "favorite", "never"]
-        if any(term in user_message.lower() for term in special_terms):
-            importance += 1
-        
-        # Store in memory service
-        from domain.models.memory import Memory
-        
-        memory = Memory(
-            content=interaction,
-            memory_type="episodic",
-            importance=importance,
-            user_id=self.user_id,
-            metadata={
-                "conversation_id": self.conversation.conversation_id,
-                "interaction_type": "conversation"
-            }
-        )
-        
-        self.memory_service.store_memory(memory)
     
     def get_stats(self) -> Dict[str, Any]:
         """

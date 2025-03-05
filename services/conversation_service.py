@@ -3,7 +3,8 @@ Conversation service interface for Luna.
 
 This module defines the interface for conversation management.
 """
-
+import uuid
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from domain.models.conversation import Message, Conversation, MessageContent
 from services.user_service import UserService
@@ -39,6 +40,13 @@ class ConversationService:
             Conversation: The conversation or None if not found
         """
         return self.conversations.get(conversation_id)
+
+    def get_conversation_id_by_user_id(self, user_id: str) -> Optional[str]:
+        conversations = self.get_conversation_by_user(user_id)
+        if len(conversations) > 0:
+            conversation_id = conversations[-1].conversation_id
+            return conversation_id
+        return None
 
     def create_conversation(self, user_id: str) -> Conversation:
         """
