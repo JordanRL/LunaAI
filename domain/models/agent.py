@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
 
-from domain.models.conversation import Message
+from domain.models.messages import Message
 from domain.models.enums import AgentType
 from routing import RoutingInstruction, ToolCall
 from tool import Tool

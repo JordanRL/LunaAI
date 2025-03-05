@@ -13,7 +13,7 @@ from adapters.console_adapter import ConsoleAdapter
 from config.settings import get_api_keys, get_app_config
 from core.agent import Agent
 from domain.models.agent import AgentResponse
-from domain.models.conversation import MessageContent
+from domain.models.messages import MessageContent
 from domain.models.routing import RoutingInstruction, ToolResponse
 from domain.models.tool import ToolRegistry
 from services.conversation_service import ConversationService

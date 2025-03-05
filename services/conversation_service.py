@@ -6,7 +6,8 @@ This module defines the interface for conversation management.
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
-from domain.models.conversation import Message, Conversation, MessageContent
+from domain.models.conversation import Conversation
+from domain.models.messages import MessageContent, Message
 from services.user_service import UserService
 
 

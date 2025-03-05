@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Any, Set
 from enum import Enum
 
 from domain.models.enums import AgentType
-from domain.models.conversation import MessageContent
+from domain.models.messages import MessageContent
 
 
 @dataclass

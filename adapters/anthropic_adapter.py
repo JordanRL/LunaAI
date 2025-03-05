@@ -6,7 +6,9 @@ This module provides an adapter for interacting with Anthropic's API.
 
 from typing import Dict, List, Any, Optional, Union
 from domain.models.agent import AgentResponse, AgentConfig
-from domain.models.conversation import Conversation, Message, MessageContent, ContentType
+from domain.models.conversation import Conversation
+from domain.models.messages import MessageContent, Message
+from domain.models.enums import ContentType
 from domain.models.routing import RoutingInstruction, ToolCall
 import anthropic
 from anthropic.types import Message as AnthropicMessage

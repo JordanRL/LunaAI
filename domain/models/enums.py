@@ -31,3 +31,12 @@ class AgentType(Enum):
         """
         exclude = ["dispatcher", "outputter", "persona_evolution"]
         return [agent.value for agent in cls if agent.value not in exclude]
+
+
+class ContentType(Enum):
+    """Types of content in a message."""
+    TEXT = "text"
+    TOOL_CALL = "tool_use"  # Anthropic API uses "tool_use" for tool calls
+    TOOL_RESULT = "tool_result"
+    IMAGE = "image"
+    # Add other content types as needed

@@ -9,7 +9,8 @@ from typing import Dict, List, Any, Optional, Union, Type
 import time
 from domain.models.agent import AgentResponse, AgentConfig
 from domain.models.routing import RoutingInstruction
-from domain.models.conversation import Message, Conversation, MessageContent
+from domain.models.conversation import Conversation
+from domain.models.messages import MessageContent, Message
 from adapters.anthropic_adapter import AnthropicAdapter
 from anthropic.types import Message as AnthropicMessage
 from copy import deepcopy
