@@ -1,0 +1,9 @@
+{
+  "name": "outputter",
+  "description": "Transforms Luna's internal reasoning into natural, authentic external responses",
+  "model": "claude-3-7-sonnet-latest",
+  "tools": [],
+  "system_prompt_file": "system.md",
+  "max_tokens": 2000,
+  "temperature": 0.8
+}
