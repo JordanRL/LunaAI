@@ -4,16 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="35398227-ce3f-4c02-9cd9-a0bd812d8726" name="Changes" comment="Refactor `MessageContent` and related classes into a new module.&#10;&#10;Moved `MessageContent`, `ToolCall`, and `ToolResponse` from various files into a new `domain.models.content` module. This improves code organization, resolves circular dependencies, and promotes modularity within the codebase.">
-      <change afterPath="$PROJECT_DIR$/TODO_FEATURES.md" afterDir="false" />
+    <list default="true" id="35398227-ce3f-4c02-9cd9-a0bd812d8726" name="Changes" comment="Add and enhance user management and Elasticsearch integration&#10;&#10;Introduced `CLAUDE.md` for guidelines and initialized TODO features document. Enhanced user services with Elasticsearch storage and retrieval for profiles and relationships. Refactored and improved data handling, indexing, and extensibility in Elasticsearch adapter.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adapters/elasticsearch_adapter.py" beforeDir="false" afterPath="$PROJECT_DIR$/adapters/elasticsearch_adapter.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/domain/models/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/domain/models/agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/domain/models/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/domain/models/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/domain/models/content.py" beforeDir="false" afterPath="$PROJECT_DIR$/domain/models/content.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/domain/models/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/domain/models/user.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/domain/tools/relationship.py" beforeDir="false" afterPath="$PROJECT_DIR$/domain/tools/relationship.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/user_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/user_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,6 +39,18 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "JordanRL"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/JordanRL/LunaAI.git",
+    "accountId": "60c77fff-13bd-46ad-9732-5a61b0a7dba4"
+  }
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 3
 }</component>
@@ -63,7 +68,7 @@
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "//wsl.localhost/Ubuntu/home/jordan/Projects/AITest/domain/models/enums.py",
+    "last_opened_file_path": "C:/Users/Jordan/WebstormProjects/StoryArchitectSystem",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -146,7 +151,7 @@
       <workItem from="1740700532669" duration="55209000" />
       <workItem from="1740806990496" duration="95951000" />
       <workItem from="1741110233778" duration="667000" />
-      <workItem from="1741110919673" duration="33847000" />
+      <workItem from="1741110919673" duration="37275000" />
     </task>
     <task id="LOCAL-00001" summary="Add core architecture, tool registry, and specialized agents&#10;&#10;Introduced the foundational structure for Luna, including core modules, adapters, domain models, and agents. Added specialized tools for cognition and reflection, system prompts for various agent tasks, and implemented Anthropic API integration for agent communication. This lays the groundwork for Luna's agent-based functionality.">
       <option name="closed" value="true" />
@@ -188,7 +193,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741160372083</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Add and enhance user management and Elasticsearch integration&#10;&#10;Introduced `CLAUDE.md` for guidelines and initialized TODO features document. Enhanced user services with Elasticsearch storage and retrieval for profiles and relationships. Refactored and improved data handling, indexing, and extensibility in Elasticsearch adapter.">
+      <option name="closed" value="true" />
+      <created>1741246062763</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1741246062763</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -200,7 +213,8 @@
     <MESSAGE value="Refactor `AgentType` to a standalone `enums` module.&#10;&#10;Moved `AgentType` from `agent.py` to a new `enums.py` to resolve circular import error." />
     <MESSAGE value="Refactor `MessageContent` and `Message` into a new module.&#10;&#10;Extracted `MessageContent`, `Message`, and related logic from `domain.models.conversation` into a dedicated `domain.models.messages` module to improve code organization and resolve circular dependency." />
     <MESSAGE value="Refactor `MessageContent` and related classes into a new module.&#10;&#10;Moved `MessageContent`, `ToolCall`, and `ToolResponse` from various files into a new `domain.models.content` module. This improves code organization, resolves circular dependencies, and promotes modularity within the codebase." />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor `MessageContent` and related classes into a new module.&#10;&#10;Moved `MessageContent`, `ToolCall`, and `ToolResponse` from various files into a new `domain.models.content` module. This improves code organization, resolves circular dependencies, and promotes modularity within the codebase." />
+    <MESSAGE value="Add and enhance user management and Elasticsearch integration&#10;&#10;Introduced `CLAUDE.md` for guidelines and initialized TODO features document. Enhanced user services with Elasticsearch storage and retrieval for profiles and relationships. Refactored and improved data handling, indexing, and extensibility in Elasticsearch adapter." />
+    <option name="LAST_COMMIT_MESSAGE" value="Add and enhance user management and Elasticsearch integration&#10;&#10;Introduced `CLAUDE.md` for guidelines and initialized TODO features document. Enhanced user services with Elasticsearch storage and retrieval for profiles and relationships. Refactored and improved data handling, indexing, and extensibility in Elasticsearch adapter." />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/AITest$user.coverage" NAME="user Coverage Results" MODIFIED="1741146450496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/domain/models" />

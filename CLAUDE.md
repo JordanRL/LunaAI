@@ -1,5 +1,16 @@
 # CLAUDE.md - AI Assistant Reference Guide
 
+## Project Overview: LunaAI
+
+LunaAI is a multi-agent personality system designed to produce the most human-like simulation of consciousness possible in conversation with modern LLMs. The system achieves this through:
+
+- **Multi-Agent Architecture**: Specialized agents handling different aspects of cognition and conversation
+- **Emergent Behaviors**: Carefully structured system prompts, agent design, and tools allowing for emergent consciousness-like behaviors
+- **Emotion Processing**: Simulation of emotional responses and relationship development
+- **Memory Systems**: Short and long-term memory mechanisms for contextual awareness
+- **Self-Reflection**: Internal thought processes for deeper reasoning capabilities
+- **Persona Evolution**: Dynamic personality development based on interactions
+
 ## Development Commands
 ```bash
 python main.py                # Run the application
