@@ -25,8 +25,8 @@ class MessageContent:
     """
     type: ContentType
     text: Optional[str] = None
-    tool_call: Optional[ToolCall] = None
-    tool_result: Optional[ToolResponse] = None
+    tool_call: Optional['ToolCall'] = None
+    tool_result: Optional['ToolResponse'] = None
     image_url: Optional[str] = None
     raw_data: Optional[Dict[str, Any]] = None
 
@@ -36,7 +36,7 @@ class MessageContent:
         return cls(type=ContentType.TEXT, text=content)
 
     @classmethod
-    def make_tool_call(cls, tool_call: ToolCall) -> 'MessageContent':
+    def make_tool_call(cls, tool_call: 'ToolCall') -> 'MessageContent':
         """Create a tool call content item from a ToolCall object."""
         return cls(type=ContentType.TOOL_CALL, tool_call=tool_call)
 
@@ -54,7 +54,7 @@ class MessageContent:
         return cls(type=ContentType.TOOL_CALL, tool_call=tool_call)
 
     @classmethod
-    def make_tool_result(cls, tool_response: ToolResponse) -> 'MessageContent':
+    def make_tool_result(cls, tool_response: 'ToolResponse') -> 'MessageContent':
         """Create a tool result content item from a ToolResponse object."""
         return cls(type=ContentType.TOOL_RESULT, tool_result=tool_response)
 

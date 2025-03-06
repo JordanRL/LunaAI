@@ -136,17 +136,6 @@ class Ethics(BaseModel):
     causes: List[str] = Field(default_factory=list)
 
 
-class TypicalUsage(BaseModel):
-    primary_purposes: List[str] = Field(default_factory=list)
-    recurring_needs: List[str] = Field(default_factory=list)
-
-
-class Feedback(BaseModel):
-    explicit_preferences: List[str] = Field(default_factory=list)
-    positive_reactions_to: List[str] = Field(default_factory=list)
-    negative_reactions_to: List[str] = Field(default_factory=list)
-
-
 class Biographical(BaseModel):
     name: Optional[str] = None
     nickname: Optional[str] = None
@@ -191,9 +180,6 @@ class ValuesAndBeliefs(BaseModel):
 class InteractionMeta(BaseModel):
     first_interaction: datetime = Field(default_factory=datetime.now)
     interaction_count: int = 0
-    platforms: List[str] = Field(default_factory=list)
-    typical_usage: TypicalUsage = Field(default_factory=TypicalUsage)
-    feedback: Feedback = Field(default_factory=Feedback)
 
 
 # --- UserRelationship Models ---
@@ -285,18 +271,6 @@ class AuthenticityLevel(BaseModel):
     restricted_areas: List[str] = Field(default_factory=list)
 
 
-class ConnectionDevelopmentGoal(BaseModel):
-    area: str
-    approach: str
-    current_status: str
-
-
-class SupportIntention(BaseModel):
-    user_goal: str
-    luna_support_approach: str
-    progress: str
-
-
 class AnxietyResponse(BaseModel):
     recognition_patterns: List[str] = Field(default_factory=list)
     effective_approaches: List[str] = Field(default_factory=list)
@@ -367,7 +341,6 @@ class UserRelationship(BaseModel):
     relationship_history: RelationshipHistory = Field(default_factory=RelationshipHistory)
     conversation_patterns: ConversationPatterns = Field(default_factory=ConversationPatterns)
     luna_subjective_experience: LunaSubjectiveExperience = Field(default_factory=LunaSubjectiveExperience)
-    relationship_goals: RelationshipGoals = Field(default_factory=RelationshipGoals)
     intervention_strategies: InterventionStrategies = Field(default_factory=InterventionStrategies)
     
     model_config = {
@@ -392,17 +365,6 @@ class UserProfile(BaseModel):
     values_and_beliefs: ValuesAndBeliefs = Field(default_factory=ValuesAndBeliefs)
     interaction_meta: InteractionMeta = Field(default_factory=InteractionMeta)
     
-    # Legacy fields (for backward compatibility)
-    name: Optional[str] = None
-    interests: List[str] = Field(default_factory=list)
-    preferences_legacy: Dict[str, Any] = Field(default_factory=dict, alias="preferences_dict")
-    attributes: Dict[str, Any] = Field(default_factory=dict)
-    is_creator: bool = False
-    interaction_count: int = 0
-    first_interaction: datetime = Field(default_factory=datetime.now)
-    last_interaction: datetime = Field(default_factory=datetime.now)
-    relationship: Optional[UserRelationship] = None
-    
     model_config = {
         "validate_assignment": True,
         "extra": "ignore",
@@ -414,38 +376,114 @@ class UserProfile(BaseModel):
 
 class RelationshipUpdateRequest(BaseModel):
     """
-    Request to update a user relationship.
+    Request model for updating a user relationship.
     
-    Attributes:
-        user_id: User identifier
-        stage: New relationship stage
-        comfort_level: New comfort level
-        trust_level: New trust level
-        connection_point: New connection point to add
-        shared_experience: New shared experience to add
-        inside_reference: New inside reference to add
-        relationship_update: Description of the relationship update
+    This class represents a request to update aspects of Luna's relationship with a user.
+    It matches the structure of UserRelationship but in a simplified form for API requests.
     """
+    # Core identification and update description
     user_id: str
-    stage: Optional[RelationshipStage] = None
-    comfort_level: Optional[int] = None
-    trust_level: Optional[TrustLevel] = None
-    connection_point: Optional[str] = None
-    shared_experience: Optional[str] = None
-    inside_reference: Optional[str] = None
-    relationship_update: str = ""
+    relationship_update: str  # General description of the update
     
-    # New fields for enhanced relationship updates
-    emotional_safety_update: Optional[Dict[str, List[str]]] = None
-    key_moment: Optional[Dict[str, str]] = None
-    luna_emotional_response: Optional[Dict[str, List[str]]] = None
-    conversation_pattern_update: Optional[Dict[str, Any]] = None
-    relationship_goal_update: Optional[Dict[str, Any]] = None
+    # Relationship stage info
+    stage: Optional[str] = None  # One of the values from RelationshipStage enum
     
-    @field_validator("comfort_level")
-    def validate_comfort_level(cls, v):
+    # Emotional dynamics
+    comfort_level: Optional[int] = None  # 1-10 scale
+    trust_level: Optional[str] = None  # One of the values from TrustLevel enum
+    
+    # Emotional safety
+    sensitive_topics: Optional[List[str]] = None
+    approach_carefully: Optional[List[str]] = None
+    avoid_topics: Optional[List[str]] = None
+    
+    # Emotional resonance
+    positive_response_topics: Optional[List[str]] = None
+    deep_engagement_topics: Optional[List[str]] = None
+    tension_points: Optional[List[str]] = None
+    
+    # Luna's emotional responses
+    joy_triggers: Optional[List[str]] = None
+    pride_moments: Optional[List[str]] = None
+    challenge_areas: Optional[List[str]] = None
+    
+    # Successful approaches by category
+    approach_category: Optional[str] = None  # Category name
+    approach_technique: Optional[str] = None  # Technique that works well
+    
+    # Communication adjustment
+    communication_area: Optional[str] = None
+    communication_adjustment: Optional[str] = None
+    communication_result: Optional[str] = None
+    
+    # Conversation flow
+    typical_opening: Optional[str] = None
+    conversation_depth: Optional[str] = None
+    closing_pattern: Optional[str] = None
+    special_interaction_note: Optional[str] = None
+    
+    # Connection quality ratings (1-10)
+    intellectual_connection: Optional[int] = None
+    emotional_connection: Optional[int] = None
+    creative_connection: Optional[int] = None
+    overall_connection: Optional[int] = None
+    
+    # Growth through relationship
+    growth_area: Optional[str] = None
+    growth_insight: Optional[str] = None
+    growth_impact: Optional[str] = None
+    
+    # Authenticity
+    authenticity_level: Optional[str] = None  # low, medium, high
+    authenticity_evolution: Optional[str] = None
+    restricted_area: Optional[str] = None
+    
+    # Intervention strategies - anxiety
+    anxiety_recognition: Optional[str] = None
+    anxiety_approach: Optional[str] = None
+    anxiety_backfire_risk: Optional[str] = None
+    
+    # Intervention strategies - motivation
+    effective_encouragement: Optional[str] = None
+    accountability_preference: Optional[str] = None
+    celebration_style: Optional[str] = None
+    
+    # Intervention strategies - conflict
+    misunderstanding_response: Optional[str] = None
+    repair_approach: Optional[str] = None
+    prevention_strategy: Optional[str] = None
+    
+    model_config = {
+        "validate_assignment": True,
+        "extra": "ignore",
+        "json_schema_extra": {
+            "description": "Request to update a user relationship with Luna"
+        }
+    }
+    
+    @field_validator("comfort_level", "intellectual_connection", "emotional_connection", 
+                    "creative_connection", "overall_connection")
+    def validate_rating(cls, v):
         if v is not None and not 1 <= v <= 10:
-            raise ValueError("Comfort level must be between 1 and 10")
+            raise ValueError("Rating must be between 1 and 10")
+        return v
+        
+    @field_validator("stage")
+    def validate_stage(cls, v):
+        if v is not None and v not in [s.value for s in RelationshipStage]:
+            raise ValueError(f"Stage must be one of: {', '.join([s.value for s in RelationshipStage])}")
+        return v
+        
+    @field_validator("trust_level")
+    def validate_trust_level(cls, v):
+        if v is not None and v not in [t.value for t in TrustLevel]:
+            raise ValueError(f"Trust level must be one of: {', '.join([t.value for t in TrustLevel])}")
+        return v
+        
+    @field_validator("authenticity_level")
+    def validate_authenticity_level(cls, v):
+        if v is not None and v not in ["low", "medium", "high"]:
+            raise ValueError("Authenticity level must be one of: low, medium, high")
         return v
 
 
@@ -456,7 +494,10 @@ if __name__ == "__main__":
     console.print(JSON(json.dumps(UserRelationship.model_json_schema())))
     console.print("\n\n")
 
-
     console.print("User Profile Model")
     console.print(JSON(json.dumps(UserProfile.model_json_schema())))
+    console.print("\n\n")
+    
+    console.print("Relationship Update Request Model")
+    console.print(JSON(json.dumps(RelationshipUpdateRequest.model_json_schema())))
     console.print("\n\n")

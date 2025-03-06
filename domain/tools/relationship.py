@@ -3,18 +3,18 @@ Relationship tools for managing user relationships.
 """
 
 from typing import Dict, List, Any, Optional
-import traceback
 
 from domain.models.tool import Tool, ToolCategory
 from domain.models.user import UserProfile, UserRelationship, RelationshipStage, TrustLevel, RelationshipUpdateRequest
-from debug import debug_manager, DebugLevel, log, log_error
+from services.user_service import UserService
 
 
 class RelationshipUpdateTool(Tool):
     """Tool for updating Luna's relationship with a user."""
     
-    def __init__(self):
+    def __init__(self, user_service: UserService):
         """Initialize the relationship update tool."""
+        self.user_service = user_service
         super().__init__(
             name="update_relationship",
             description="""Update Luna's relationship understanding with a user.
@@ -28,60 +28,241 @@ Relationship stages:
 - established_connection: Regular interaction with mutual understanding  
 - close_relationship: Deep familiarity and authentic connection
 
-To use effectively:
-- Always provide a descriptive relationship_update about what changed
-- Update the relationship stage when significant shifts occur
-- Record connection_points (shared interests, values)
-- Document shared_experiences that Luna can reference later
-- Note inside_references (jokes, references that would only make sense to Luna and this user)
-- Update comfort_level (1-10) to reflect how comfortable Luna feels with the user""",
+This tool supports a rich relationship model with the following categories of data:
+- Relationship stage and comfort level: How the relationship is developing
+- Emotional dynamics: How Luna feels with this user
+- Relationship history: Key moments and shared context
+- Conversation patterns: What communication approaches work best
+- Luna's subjective experience: How Luna perceives the relationship
+- Intervention strategies: How to handle various user emotional states
+
+Core fields:
+- user_id: The user identifier
+- stage: Relationship stage (new_acquaintance, developing_rapport, established_connection, close_relationship)
+- comfort_level: Comfort level with the user (1-10)
+- trust_level: Trust level with the user (initial, developing, established, deep)
+
+See the full schema for additional fields that can be used to provide detailed relationship data.""",
             input_schema={
                 "type": "object",
                 "properties": {
+                    # Core identification 
                     "user_id": {
                         "type": "string",
                         "description": "User identifier"
                     },
+                    
+                    # Relationship stage
                     "stage": {
                         "type": "string",
                         "description": "Relationship stage (new_acquaintance, developing_rapport, established_connection, close_relationship)",
-                        "enum": [s.value for s in RelationshipStage],
-                        "default": ""
+                        "enum": [s.value for s in RelationshipStage]
                     },
+                    
+                    # Emotional dynamics
                     "comfort_level": {
                         "type": "integer",
                         "description": "Comfort level with the user (1-10)",
                         "minimum": 1,
-                        "maximum": 10,
-                        "default": 0
+                        "maximum": 10
                     },
                     "trust_level": {
                         "type": "string",
                         "description": "Trust level with the user (initial, developing, established, deep)",
-                        "enum": [t.value for t in TrustLevel],
-                        "default": ""
+                        "enum": [t.value for t in TrustLevel]
                     },
-                    "relationship_update": {
-                        "type": "string",
-                        "description": "Description of the relationship development or update"
+                    
+                    # Emotional safety topics
+                    "sensitive_topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics that are sensitive for this user"
                     },
-                    "connection_point": {
-                        "type": "string",
-                        "description": "A new connection point with the user (common interest, shared value, etc.)",
-                        "default": ""
+                    "approach_carefully": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics to approach with care for this user"
                     },
-                    "shared_experience": {
-                        "type": "string",
-                        "description": "A new shared experience with the user",
-                        "default": ""
+                    "avoid_topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics to avoid with this user"
                     },
-                    "inside_reference": {
+                    
+                    # Emotional resonance
+                    "positive_response_topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics that trigger positive responses"
+                    },
+                    "deep_engagement_topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics that lead to deep engagement"
+                    },
+                    "tension_points": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Topics that create tension"
+                    },
+                    
+                    # Luna's emotional responses
+                    "joy_triggers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "What brings Luna joy with this user"
+                    },
+                    "pride_moments": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Moments that make Luna feel proud"
+                    },
+                    "challenge_areas": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Areas that challenge Luna with this user"
+                    },
+                    
+                    # Successful approaches
+                    "approach_category": {
                         "type": "string",
-                        "description": "A new inside joke or reference shared with the user",
-                        "default": ""
+                        "description": "Category of successful approach (e.g., 'explanation', 'emotional_support')"
+                    },
+                    "approach_technique": {
+                        "type": "string",
+                        "description": "Specific technique that works well in that category"
+                    },
+                    
+                    # Communication adjustment
+                    "communication_area": {
+                        "type": "string",
+                        "description": "Area of communication that needed adjustment"
+                    },
+                    "communication_adjustment": {
+                        "type": "string",
+                        "description": "How Luna adjusted communication"
+                    },
+                    "communication_result": {
+                        "type": "string",
+                        "description": "Result of the communication adjustment"
+                    },
+                    
+                    # Conversation flow
+                    "typical_opening": {
+                        "type": "string",
+                        "description": "Typical conversation opening with this user"
+                    },
+                    "conversation_depth": {
+                        "type": "string",
+                        "description": "How conversations typically progress in depth"
+                    },
+                    "closing_pattern": {
+                        "type": "string",
+                        "description": "How conversations typically conclude"
+                    },
+                    "special_interaction_note": {
+                        "type": "string",
+                        "description": "Special note about interactions with this user"
+                    },
+                    
+                    # Connection quality
+                    "intellectual_connection": {
+                        "type": "integer",
+                        "description": "Intellectual connection quality (1-10)",
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    "emotional_connection": {
+                        "type": "integer",
+                        "description": "Emotional connection quality (1-10)",
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    "creative_connection": {
+                        "type": "integer",
+                        "description": "Creative connection quality (1-10)",
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    "overall_connection": {
+                        "type": "integer",
+                        "description": "Overall connection quality (1-10)",
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    
+                    # Growth through relationship
+                    "growth_area": {
+                        "type": "string",
+                        "description": "Area of Luna's growth through this relationship"
+                    },
+                    "growth_insight": {
+                        "type": "string",
+                        "description": "Insight Luna gained in this area"
+                    },
+                    "growth_impact": {
+                        "type": "string",
+                        "description": "How this growth impacted Luna"
+                    },
+                    
+                    # Authenticity
+                    "authenticity_level": {
+                        "type": "string",
+                        "description": "Current authenticity level (low, medium, high)",
+                        "enum": ["low", "medium", "high"]
+                    },
+                    "authenticity_evolution": {
+                        "type": "string",
+                        "description": "How authenticity has evolved in this relationship"
+                    },
+                    "restricted_area": {
+                        "type": "string",
+                        "description": "Area where Luna restricts authenticity"
+                    },
+                    
+                    # Intervention strategies - anxiety
+                    "anxiety_recognition": {
+                        "type": "string",
+                        "description": "Pattern for recognizing user anxiety"
+                    },
+                    "anxiety_approach": {
+                        "type": "string",
+                        "description": "Effective approach for user anxiety"
+                    },
+                    "anxiety_backfire_risk": {
+                        "type": "string",
+                        "description": "Risk of intervention backfiring"
+                    },
+                    
+                    # Intervention strategies - motivation
+                    "effective_encouragement": {
+                        "type": "string",
+                        "description": "Effective encouragement approach"
+                    },
+                    "accountability_preference": {
+                        "type": "string",
+                        "description": "User's accountability preference"
+                    },
+                    "celebration_style": {
+                        "type": "string",
+                        "description": "User's preferred celebration style"
+                    },
+                    
+                    # Intervention strategies - conflict
+                    "misunderstanding_response": {
+                        "type": "string",
+                        "description": "How user responds to misunderstandings"
+                    },
+                    "repair_approach": {
+                        "type": "string",
+                        "description": "Effective approach for repairing misunderstandings"
+                    },
+                    "prevention_strategy": {
+                        "type": "string",
+                        "description": "Strategy for preventing misunderstandings"
                     }
                 },
-                "required": ["user_id", "relationship_update"]
+                "required": ["user_id"]
             },
             handler=self.handle,
             category=ToolCategory.RELATIONSHIP
@@ -92,76 +273,20 @@ To use effectively:
         user_id = tool_input.get("user_id", "")
         relationship_update = tool_input.get("relationship_update", "")
         
-        # Extract relationship data for updates
-        relationship_data = {}
-        
-        # Check which fields are provided and add them to the update data
-        if "stage" in tool_input and tool_input["stage"]:
-            relationship_data["stage"] = tool_input["stage"]
-            
-        if "comfort_level" in tool_input and tool_input["comfort_level"] > 0:
-            relationship_data["comfort_level"] = tool_input["comfort_level"]
-            
-        if "trust_level" in tool_input and tool_input["trust_level"]:
-            relationship_data["trust_level"] = tool_input["trust_level"]
-            
-        if "connection_point" in tool_input and tool_input["connection_point"]:
-            relationship_data["connection_point"] = tool_input["connection_point"]
-            
-        if "shared_experience" in tool_input and tool_input["shared_experience"]:
-            relationship_data["shared_experience"] = tool_input["shared_experience"]
-            
-        if "inside_reference" in tool_input and tool_input["inside_reference"]:
-            relationship_data["inside_reference"] = tool_input["inside_reference"]
-        
-        log(f"Updating relationship with {user_id}: {relationship_update[:50]}...",
-           DebugLevel.STANDARD, debug_manager.symbols.PROCESSING)
-           
-        # Log relationship details at VERBOSE level
-        if debug_manager.should_debug(DebugLevel.VERBOSE):
-            log("Relationship update details:", DebugLevel.VERBOSE)
-            for key, value in relationship_data.items():
-                log(f"  {key}: {value}", DebugLevel.VERBOSE)
-        
         try:
-            # Call the actual relationship update logic
-            from users import UserManager
-            user_manager = UserManager()
+            # Create relationship update request directly from tool_input
+            # This will pass all provided fields to the request object
+            update_request = RelationshipUpdateRequest(user_id=user_id, relationship_update=relationship_update)
             
-            # Make sure we have at least one thing to update
-            if not relationship_data:
-                error_msg = "No relationship data provided for update"
-                log_error(error_msg, "relationship_update")
-                return {
-                    "success": False,
-                    "user_id": user_id,
-                    "message": error_msg
-                }
+            # Copy any additional fields from tool_input to update_request
+            for key, value in tool_input.items():
+                if key not in ["user_id", "relationship_update"] and value:
+                    if hasattr(update_request, key):
+                        setattr(update_request, key, value)
             
-            # First make sure the user exists by creating or getting the profile
-            is_new_user, user_profile, existing_relationship = user_manager.create_or_get_user(user_id)
-            if is_new_user:
-                log(f"Created new user profile for {user_id}",
-                   DebugLevel.STANDARD, debug_manager.symbols.SUCCESS)
-            
-            # Store the relationship update description in memory
-            from memory import store_memory_in_chroma
-            memory_id = store_memory_in_chroma(
-                text=relationship_update,
-                memory_type="relationship",
-                importance=7,
-                metadata={
-                    "user_id": user_id,
-                    "update_type": "relationship_note"
-                }
-            )
-            
-            # Update the relationship data
-            updated_relationship = user_manager.update_user_relationship(
-                user_id=user_id,
-                relationship_data=relationship_data,
-                store_memory=True
-            )
+            # Update the relationship data - this will also store the memory
+            updated_relationship = self.user_service.update_user_relationship(update_request)
+            memory_id = "stored_with_relationship"  # The memory is now stored by the UserService
             
             if not updated_relationship:
                 return {
@@ -175,27 +300,16 @@ To use effectively:
                 "success": True,
                 "user_id": user_id,
                 "message": f"Updated relationship with {user_id}",
-                "relationship_stage": updated_relationship.get("stage", "unknown"),
-                "comfort_level": updated_relationship.get("comfort_level", 0),
+                "relationship_stage": updated_relationship.relationship_stage.current_stage,
+                "comfort_level": updated_relationship.emotional_dynamics.luna_comfort_level,
+                "trust_level": updated_relationship.emotional_dynamics.trust_level,
                 "memory_id": memory_id
             }
             
             return result
-            
-        except Exception as e:
-            error_msg = f"Error updating relationship: {str(e)}"
-            log_error(error_msg, "relationship_update")
-            
-            # Show more details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                trace = traceback.format_exc()
-                log("Exception traceback:", DebugLevel.VERBOSE, debug_manager.symbols.ERROR)
-                for line in trace.split("\n"):
-                    log(f"  {line}", DebugLevel.VERBOSE)
-                    
+        except Exception:
             return {
                 "success": False,
                 "user_id": user_id,
-                "error": str(e),
                 "message": "Failed to update relationship"
             }

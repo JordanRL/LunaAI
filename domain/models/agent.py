@@ -3,9 +3,10 @@ from typing import Dict, List, Any, Optional
 
 from domain.models.messages import Message
 from domain.models.enums import AgentType
-from routing import RoutingInstruction
 from domain.models.content import ToolCall
-from tool import Tool
+from domain.models.routing import RoutingInstruction
+from domain.models.tool import Tool
+
 
 @dataclass
 class AgentResponse:
