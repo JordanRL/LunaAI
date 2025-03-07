@@ -1,10 +1,10 @@
 from typing import Callable
 
-from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
+from rich.align import Align
+from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.align import Align
 from rich.spinner import Spinner
 from rich.status import Status
 from rich.style import StyleType
@@ -18,7 +18,7 @@ class ResponsivePanel:
         renderable: RenderableType,
         width_percentage: float = 0.7,
         align: str = "left",
-        **panel_kwargs
+        **panel_kwargs,
     ):
         """
         Initialize a responsive panel.
@@ -34,26 +34,19 @@ class ResponsivePanel:
         self.align = align
         self.panel_kwargs = panel_kwargs
 
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         # Calculate width based on container width
         available_width = options.max_width
         panel_width = int(available_width * self.width_percentage)
 
         # Create panel with calculated width
-        panel = Panel(
-          self.renderable,
-          width=panel_width,
-          **self.panel_kwargs
-        )
+        panel = Panel(self.renderable, width=panel_width, **self.panel_kwargs)
 
         # Apply alignment
         if self.align == "right":
-          aligned_panel = Align.right(panel)
+            aligned_panel = Align.right(panel)
         else:
-          aligned_panel = Align.left(panel)
+            aligned_panel = Align.left(panel)
 
         # Yield the panel for rendering
         yield aligned_panel
-

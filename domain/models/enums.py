@@ -6,6 +6,7 @@ class AgentType(Enum):
     """
     Available agent types for routing.
     """
+
     DISPATCHER = "dispatcher"
     MEMORY_RETRIEVER = "memory_retriever"
     MEMORY_WRITER = "memory_writer"
@@ -33,6 +34,7 @@ class AgentType(Enum):
 
 class ContentType(Enum):
     """Types of content in a message."""
+
     TEXT = "text"
     TOOL_CALL = "tool_use"  # Anthropic API uses "tool_use" for tool calls
     TOOL_RESULT = "tool_result"

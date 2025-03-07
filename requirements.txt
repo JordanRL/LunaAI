@@ -1,14 +1,21 @@
 # Core dependencies
 anthropic>=0.18.0
 chromadb>=0.4.22
-pytest>=7.4.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
 
 # Project dependencies
 numpy>=1.24.0
-pyyaml>=6.0
-python-dotenv>=1.0.0
 rich~=13.7.1
 elasticsearch~=8.17.1
 panel~=1.5.2
 textual~=2.1.2
 elastic-transport~=8.17.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+mypy>=1.7.0
+black>=23.11.0
+isort>=5.12.0
+flake8>=6.1.0

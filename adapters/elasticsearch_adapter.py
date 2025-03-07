@@ -1,5 +1,7 @@
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from elasticsearch import Elasticsearch
+
 from domain.models.config import (
     LunaMemoriesIndexSchema,
     UserProfileIndexSchema,
@@ -134,9 +136,7 @@ class ElasticsearchAdapter:
                 },
             )
         except Exception as e:
-            raise ConnectionError(
-                f"Failed to initialize user relationship index: {str(e)}"
-            )
+            raise ConnectionError(f"Failed to initialize user relationship index: {str(e)}")
 
     # Memory-related methods
     def store_memory(self, memory: Memory) -> Optional[Dict[str, Any]]:
@@ -187,9 +187,7 @@ class ElasticsearchAdapter:
         except Exception as e:
             raise Exception(f"Failed to retrieve memory: {str(e)}")
 
-    def search_memories(
-        self, query: Dict[str, Any], size: int = 10
-    ) -> Optional[Dict[str, Any]]:
+    def search_memories(self, query: Dict[str, Any], size: int = 10) -> Optional[Dict[str, Any]]:
         """
         Search for memories using an Elasticsearch query.
 
@@ -204,9 +202,7 @@ class ElasticsearchAdapter:
             Exception: If search operation fails
         """
         try:
-            response = self.es.search(
-                index=self.memory_index_name, body=query, size=size
-            )
+            response = self.es.search(index=self.memory_index_name, body=query, size=size)
             return response.body
         except Exception as e:
             raise Exception(f"Failed to search memories: {str(e)}")
@@ -306,13 +302,10 @@ class ElasticsearchAdapter:
         try:
             # Use options for ES 8.x compatibility
             client = self.es.options(ignore_status=self.IGNORED_STATUS_CODES)
-            response = client.get(
-                index=self.user_profile_index_name,
-                id=user_id
-            )
+            response = client.get(index=self.user_profile_index_name, id=user_id)
 
             # For Elasticsearch 8.x, check the found field
-            if not response.get('found', False):
+            if not response.get("found", False):
                 return None
 
             # Convert Elasticsearch document back to UserProfile
@@ -322,9 +315,7 @@ class ElasticsearchAdapter:
             raise Exception(f"Failed to retrieve user profile: {str(e)}")
 
     # User Relationship methods
-    def store_user_relationship(
-        self, relationship: UserRelationship
-    ) -> Optional[Dict[str, Any]]:
+    def store_user_relationship(self, relationship: UserRelationship) -> Optional[Dict[str, Any]]:
         """
         Store a user relationship in Elasticsearch.
 
@@ -369,13 +360,10 @@ class ElasticsearchAdapter:
         try:
             # Use options for ES 8.x compatibility
             client = self.es.options(ignore_status=self.IGNORED_STATUS_CODES)
-            response = client.get(
-                index=self.user_relationship_index_name,
-                id=user_id
-            )
+            response = client.get(index=self.user_relationship_index_name, id=user_id)
 
             # For Elasticsearch 8.x, check the found field
-            if not response.get('found', False):
+            if not response.get("found", False):
                 return None
 
             # Convert Elasticsearch document back to UserRelationship
@@ -401,9 +389,7 @@ class ElasticsearchAdapter:
         except Exception:
             return False
 
-    def update_user_profile_field(
-        self, user_id: str, field_path: str, value: Any
-    ) -> bool:
+    def update_user_profile_field(self, user_id: str, field_path: str, value: Any) -> bool:
         """
         Update a specific field in a user profile.
 
@@ -419,20 +405,16 @@ class ElasticsearchAdapter:
             # Use options for ES 8.x compatibility
             client = self.es.options(ignore_status=[404])
             response = client.update(
-                index=self.user_profile_index_name,
-                id=user_id,
-                body={"doc": {field_path: value}}
+                index=self.user_profile_index_name, id=user_id, body={"doc": {field_path: value}}
             )
-            
+
             # Check if result indicates success
-            result = response.get('result', None)
+            result = response.get("result", None)
             return result in ["updated", "noop"]
         except Exception:
             return False
 
-    def update_user_relationship_field(
-        self, user_id: str, field_path: str, value: Any
-    ) -> bool:
+    def update_user_relationship_field(self, user_id: str, field_path: str, value: Any) -> bool:
         """
         Update a specific field in a user relationship.
 
@@ -450,11 +432,11 @@ class ElasticsearchAdapter:
             response = client.update(
                 index=self.user_relationship_index_name,
                 id=user_id,
-                body={"doc": {field_path: value}}
+                body={"doc": {field_path: value}},
             )
-            
+
             # Check if result indicates success
-            result = response.get('result', None)
+            result = response.get("result", None)
             return result in ["updated", "noop"]
         except Exception:
             return False
@@ -474,9 +456,9 @@ class ElasticsearchAdapter:
             # Use options for ES 8.x compatibility
             client = self.es.options(ignore_status=self.IGNORED_STATUS_CODES)
             response = client.indices.delete(index=index_name)
-            
+
             # Check if the operation was acknowledged
-            return response.get('acknowledged', False)
+            return response.get("acknowledged", False)
         except Exception as e:
             print(f"Error deleting index {index_name}: {str(e)}")
             return False
@@ -543,9 +525,7 @@ class ElasticsearchAdapter:
         try:
             # Use options for ES 8.x compatibility
             client = self.es.options(ignore_status=[404])
-            response = client.update(
-                index=index_name, id=doc_id, body={"doc": updates}
-            )
+            response = client.update(index=index_name, id=doc_id, body={"doc": updates})
             # In Elasticsearch 8.x, response is directly the dict
             return response
         except Exception as e:

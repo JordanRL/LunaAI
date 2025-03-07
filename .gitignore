@@ -1,2 +1,23 @@
 .idea
 logs
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# IDE files
+.vscode/
+
+# Testing and CI
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log

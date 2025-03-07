@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from anthropic.types import Message as AnthropicMessage
 
@@ -24,6 +24,7 @@ class Message:
         message_id: Unique identifier for the message
         metadata: Additional data associated with this message
     """
+
     role: str  # user, assistant, system
     content: List[MessageContent]
     timestamp: datetime = field(default_factory=datetime.now)
@@ -31,47 +32,36 @@ class Message:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def user(cls, text: str) -> 'Message':
+    def user(cls, text: str) -> "Message":
         """Create a simple user text message."""
-        return cls(
-            role="user",
-            content=[MessageContent.make_text(text)]
-        )
+        return cls(role="user", content=[MessageContent.make_text(text)])
 
     @classmethod
-    def user_with_tool_result(cls, tool_id: str, result: Any, error: Optional[str] = None) -> 'Message':
+    def user_with_tool_result(
+        cls, tool_id: str, result: Any, error: Optional[str] = None
+    ) -> "Message":
         """Create a user message with tool result."""
-        return cls(
-            role="user",
-            content=[MessageContent.simple_tool_result(tool_id, result, error)]
-        )
+        return cls(role="user", content=[MessageContent.simple_tool_result(tool_id, result, error)])
 
     @classmethod
-    def assistant(cls, text: str) -> 'Message':
+    def assistant(cls, text: str) -> "Message":
         """Create a simple assistant text message."""
-        return cls(
-            role="assistant",
-            content=[MessageContent.make_text(text)]
-        )
+        return cls(role="assistant", content=[MessageContent.make_text(text)])
 
     @classmethod
-    def assistant_with_tool_call(cls, tool_name: str, tool_input: Dict[str, Any]) -> 'Message':
+    def assistant_with_tool_call(cls, tool_name: str, tool_input: Dict[str, Any]) -> "Message":
         """Create an assistant message with a tool call."""
         return cls(
-            role="assistant",
-            content=[MessageContent.simple_tool_call(tool_name, tool_input)]
+            role="assistant", content=[MessageContent.simple_tool_call(tool_name, tool_input)]
         )
 
     @classmethod
-    def system(cls, text: str) -> 'Message':
+    def system(cls, text: str) -> "Message":
         """Create a simple system text message."""
-        return cls(
-            role="system",
-            content=[MessageContent.make_text(text)]
-        )
+        return cls(role="system", content=[MessageContent.make_text(text)])
 
     @classmethod
-    def from_anthropic_message(cls, message: AnthropicMessage) -> 'Message':
+    def from_anthropic_message(cls, message: AnthropicMessage) -> "Message":
         """Create a Message from an Anthropic API message."""
         role = message.role
         content_items = message.content
@@ -88,7 +78,9 @@ class Message:
         return cls(
             role=role,
             content=content,
-            message_id=message.get("id", str(uuid.uuid4())) if "id" in message else str(uuid.uuid4())
+            message_id=(
+                message.get("id", str(uuid.uuid4())) if "id" in message else str(uuid.uuid4())
+            ),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -101,10 +93,7 @@ class Message:
                         "content": [],
                     }
 
-        return {
-            "role": self.role,
-            "content": [item.to_dict() for item in self.content]
-        }
+        return {"role": self.role, "content": [item.to_dict() for item in self.content]}
 
     def has_text(self) -> bool:
         """Check if this message contains any text content."""
@@ -120,17 +109,25 @@ class Message:
 
     def get_text(self) -> str:
         """Get all text content concatenated."""
-        return " ".join(item.text or "" for item in self.content if item.type == ContentType.TEXT and item.text)
+        return " ".join(
+            item.text or "" for item in self.content if item.type == ContentType.TEXT and item.text
+        )
 
     def get_tool_calls(self) -> List[ToolCall]:
         """Get all tool calls."""
-        return [item.tool_call for item in self.content
-                if item.type == ContentType.TOOL_CALL and item.tool_call is not None]
+        return [
+            item.tool_call
+            for item in self.content
+            if item.type == ContentType.TOOL_CALL and item.tool_call is not None
+        ]
 
     def get_tool_results(self) -> List[ToolResponse]:
         """Get all tool results."""
-        return [item.tool_result for item in self.content
-                if item.type == ContentType.TOOL_RESULT and item.tool_result is not None]
+        return [
+            item.tool_result
+            for item in self.content
+            if item.type == ContentType.TOOL_RESULT and item.tool_result is not None
+        ]
 
     def add_content(self, content_item: MessageContent) -> None:
         """Add a content item to this message."""

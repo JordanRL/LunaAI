@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from domain.models.messages import Message
-from domain.models.enums import AgentType
 from domain.models.content import ToolCall
+from domain.models.enums import AgentType
+from domain.models.messages import Message
 from domain.models.routing import RoutingInstruction
 from domain.models.tool import Tool
 
@@ -12,7 +12,7 @@ from domain.models.tool import Tool
 class AgentResponse:
     """
     Response from an agent execution.
-    
+
     Attributes:
         message: Primary message in the response
         metadata: Additional metadata about the response
@@ -20,6 +20,7 @@ class AgentResponse:
         raw_response: Raw response from the API
         routing: List of routing instructions from this response
     """
+
     message: Message
     metadata: Dict[str, Any] = field(default_factory=dict)
     stop_reason: Optional[str] = None
@@ -29,7 +30,7 @@ class AgentResponse:
     def has_text(self) -> bool:
         """Check if this response has text content."""
         return self.message.has_text()
-    
+
     def is_using_tools(self) -> bool:
         """Check if this response is using tools."""
         return self.stop_reason == "tool_use" and self.message.has_tool_calls()
@@ -42,11 +43,12 @@ class AgentResponse:
         """Get the tool use blocks in this response."""
         return self.message.get_tool_calls()
 
+
 @dataclass
 class AgentMetric:
     """
     Metrics for an agent execution.
-    
+
     Attributes:
         agent_name: Name of the agent
         tokens_used: Total tokens used
@@ -55,6 +57,7 @@ class AgentMetric:
         execution_time: Time taken to execute
         tools_used: List of tools used
     """
+
     agent_name: str
     tokens_used: int
     input_tokens: int = 0
@@ -62,11 +65,12 @@ class AgentMetric:
     execution_time: float = 0.0
     tools_used: List[str] = field(default_factory=list)
 
+
 @dataclass
 class AgentConfig:
     """
     Configuration for an agent.
-    
+
     Attributes:
         name: Name of the agent
         model: Model to use
@@ -75,6 +79,7 @@ class AgentConfig:
         max_tokens: Maximum tokens for this agent
         temperature: Temperature setting
     """
+
     name: AgentType
     model: str
     system_prompt: Optional[str] = None

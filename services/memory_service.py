@@ -4,25 +4,26 @@ Memory service interface for Luna.
 This module defines the interface for memory storage and retrieval.
 """
 
-from typing import Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from dateutil.parser import parse as parse_date
 
 from adapters.elasticsearch_adapter import ElasticsearchAdapter
+from domain.models.emotion import EmotionalState
 from domain.models.memory import (
+    EmotionalMemory,
+    EmotionalMemoryQuery,
+    EpisodicMemory,
+    EpisodicMemoryQuery,
     Memory,
     MemoryQuery,
     MemoryResult,
-    EpisodicMemory,
-    SemanticMemory,
-    EmotionalMemory,
     RelationshipMemory,
-    EpisodicMemoryQuery,
-    SemanticMemoryQuery,
-    EmotionalMemoryQuery,
     RelationshipMemoryQuery,
+    SemanticMemory,
+    SemanticMemoryQuery,
 )
-from domain.models.emotion import EmotionalState
 
 
 class MemoryService:
@@ -40,9 +41,7 @@ class MemoryService:
             es_adapter: ElasticsearchAdapter for storage operations
         """
         self.es_adapter = es_adapter
-        self._memory_cache = (
-            {}
-        )  # Simple in-memory cache: memory_id -> (memory, timestamp)
+        self._memory_cache = {}  # Simple in-memory cache: memory_id -> (memory, timestamp)
         self._cache_ttl = 300  # Cache TTL in seconds (5 minutes)
 
     def store_memory(self, memory: Memory) -> str:
@@ -204,9 +203,7 @@ class MemoryService:
         """
         try:
             # Only update if the memory exists
-            if self.es_adapter.check_document_exists(
-                self.es_adapter.memory_index_name, memory_id
-            ):
+            if self.es_adapter.check_document_exists(self.es_adapter.memory_index_name, memory_id):
                 # Use the adapter's update method
                 self.es_adapter.update_document(
                     index_name=self.es_adapter.memory_index_name,
@@ -253,9 +250,7 @@ class MemoryService:
             filter_clauses.append({"term": {"memory_type": query.memory_type}})
 
         if query.importance_threshold is not None:
-            filter_clauses.append(
-                {"range": {"importance": {"gte": query.importance_threshold}}}
-            )
+            filter_clauses.append({"range": {"importance": {"gte": query.importance_threshold}}})
 
         if query.user_id:
             filter_clauses.append({"term": {"user_id": query.user_id}})
@@ -313,9 +308,7 @@ class MemoryService:
 
         elif isinstance(query, SemanticMemoryQuery):
             if query.certainty_threshold is not None:
-                filter_clauses.append(
-                    {"range": {"certainty": {"gte": query.certainty_threshold}}}
-                )
+                filter_clauses.append({"range": {"certainty": {"gte": query.certainty_threshold}}})
 
             if query.verifiability_threshold is not None:
                 filter_clauses.append(
@@ -330,13 +323,7 @@ class MemoryService:
 
             if query.source_reliability_threshold is not None:
                 filter_clauses.append(
-                    {
-                        "range": {
-                            "source_reliability": {
-                                "gte": query.source_reliability_threshold
-                            }
-                        }
-                    }
+                    {"range": {"source_reliability": {"gte": query.source_reliability_threshold}}}
                 )
 
         elif isinstance(query, EmotionalMemoryQuery):
@@ -345,11 +332,7 @@ class MemoryService:
 
             if query.event_pleasure_threshold is not None:
                 filter_clauses.append(
-                    {
-                        "range": {
-                            "event_pleasure": {"gte": query.event_pleasure_threshold}
-                        }
-                    }
+                    {"range": {"event_pleasure": {"gte": query.event_pleasure_threshold}}}
                 )
 
             if query.event_arousal_threshold is not None:
@@ -359,28 +342,18 @@ class MemoryService:
 
             if query.event_dominance_threshold is not None:
                 filter_clauses.append(
-                    {
-                        "range": {
-                            "event_dominance": {"gte": query.event_dominance_threshold}
-                        }
-                    }
+                    {"range": {"event_dominance": {"gte": query.event_dominance_threshold}}}
                 )
 
         elif isinstance(query, RelationshipMemoryQuery):
             if query.relationship_type:
-                filter_clauses.append(
-                    {"term": {"relationship_type": query.relationship_type}}
-                )
+                filter_clauses.append({"term": {"relationship_type": query.relationship_type}})
 
             if query.closeness_threshold is not None:
-                filter_clauses.append(
-                    {"range": {"closeness": {"gte": query.closeness_threshold}}}
-                )
+                filter_clauses.append({"range": {"closeness": {"gte": query.closeness_threshold}}})
 
             if query.trust_threshold is not None:
-                filter_clauses.append(
-                    {"range": {"trust": {"gte": query.trust_threshold}}}
-                )
+                filter_clauses.append({"range": {"trust": {"gte": query.trust_threshold}}})
 
             if query.apprehension_threshold is not None:
                 filter_clauses.append(
@@ -403,9 +376,7 @@ class MemoryService:
             bool_query["filter"] = filter_clauses
         if should_clauses:
             bool_query["should"] = should_clauses
-            if (
-                not must_clauses
-            ):  # If no must clauses, require at least one should match
+            if not must_clauses:  # If no must clauses, require at least one should match
                 bool_query["minimum_should_match"] = 1
 
         # If empty query, use match_all
@@ -420,9 +391,7 @@ class MemoryService:
             ],
         }
 
-    def _process_search_results(
-        self, response: Dict[str, Any], query: MemoryQuery
-    ) -> MemoryResult:
+    def _process_search_results(self, response: Dict[str, Any], query: MemoryQuery) -> MemoryResult:
         """
         Process Elasticsearch search results into a MemoryResult.
 
@@ -486,8 +455,7 @@ class MemoryService:
             # Create emotional state if emotion data exists
             emotion = None
             if any(
-                key in doc
-                for key in ["emotion_pleasure", "emotion_arousal", "emotion_dominance"]
+                key in doc for key in ["emotion_pleasure", "emotion_arousal", "emotion_dominance"]
             ):
                 emotion = EmotionalState(
                     pleasure=doc.get("emotion_pleasure"),
