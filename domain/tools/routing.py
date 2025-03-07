@@ -121,6 +121,5 @@ You may only use this tool once per turn.""",
 
         return {
             "reason": reason,
-            "current_thoughts": current_thoughts,
-            "warning": ""
+            "current_thoughts": current_thoughts
         }

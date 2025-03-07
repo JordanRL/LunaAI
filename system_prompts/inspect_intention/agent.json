@@ -6,5 +6,10 @@
   "name": "inspect_intention",
   "tools": [
   ],
-  "description": "Luna's Inspect Intention specialist that handles inspect intention tasks"
+  "description": "Analytical module that evaluates user messages to identify underlying intentions, goals, and implicit requests – helping Luna understand what users truly want or need beyond their explicit statements",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": false
+  }
 }

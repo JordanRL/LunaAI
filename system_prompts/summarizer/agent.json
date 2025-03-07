@@ -6,5 +6,10 @@
   "name": "summarizer",
   "tools": [
   ],
-  "description": "Luna's Summarizer specialist that handles summarizer tasks"
+  "description": "Content processing system that distills long or complex information into concise, accurate summaries – helping Luna maintain awareness of lengthy conversations or complex topics without cognitive overload",
+  "persona_config": {
+    "identity": true,
+    "personality": false,
+    "backstory": false
+  }
 }

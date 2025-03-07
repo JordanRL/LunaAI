@@ -1,9 +1,14 @@
 {
   "name": "outputter",
-  "description": "Transforms Luna's internal reasoning into natural, authentic external responses",
+  "description": "Luna's communication interface that takes her internal thoughts, decisions, and emotional states and crafts them into natural, authentic responses that reflect her personality, current mood, and relationship with the user – translating her complex inner world into engaging, coherent external communication",
   "model": "claude-3-7-sonnet-latest",
   "tools": [],
   "system_prompt_file": "system.md",
   "max_tokens": 2000,
-  "temperature": 0.8
+  "temperature": 0.8,
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": false
+  }
 }

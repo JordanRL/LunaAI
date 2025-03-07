@@ -12,9 +12,7 @@ class AgentType(Enum):
     EMOTION_PROCESSOR = "emotion_processor"
     RELATIONSHIP_MANAGER = "relationship_manager"
     INNER_THOUGHT = "inner_thought"
-    INSPECT_INTENTION = "inspect_intention"
     PERSONA_EVOLUTION = "persona_evolution"
-    SUMMARIZER = "summarizer"
     SELF_REFLECTION = "self_reflection"
     OUTPUTTER = "outputter"
 

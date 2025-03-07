@@ -1,11 +1,16 @@
 {
   "name": "memory_retriever",
-  "description": "Searches and retrieves relevant information from long-term memory storage",
+  "description": "Access point to Luna's long-term memory that evaluates what information would be relevant or important to recall in the current context, formulates precise memory retrieval queries, and contextualizes memories within Luna's current understanding – representing her ability to access past experiences and knowledge",
   "model": "claude-3-5-haiku-latest",
   "tools": [
     "retrieve_memory"
   ],
   "system_prompt_file": "system.md",
   "max_tokens": 2000,
-  "temperature": 0.5
+  "temperature": 0.5,
+  "persona_config": {
+    "identity": true,
+    "personality": false,
+    "backstory": false
+  }
 }

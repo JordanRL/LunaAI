@@ -42,7 +42,7 @@ class AnthropicAdapter:
         Send a message using Anthropic's API.
         
         Args:
-            system_prompt: System prompt for the message being sent
+            system_prompt: System prompt for the message being sent (already compiled)
             message: Message to send (string, MessageContent, list of MessageContent, or Message)
             history: Conversation history for the message
             agent: Agent configuration
@@ -50,6 +50,9 @@ class AnthropicAdapter:
         Returns:
             AnthropicMessage: Response from the model
         """
+        # The system_prompt is already compiled by the time it gets here,
+        # so we don't need to do any token replacement at this level
+        
         api_request = {
             "system": system_prompt,
             "messages": [msg.to_dict() for msg in history.messages],

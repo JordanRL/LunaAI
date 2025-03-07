@@ -7,5 +7,10 @@
   "tools": [
     "write_memory"
   ],
-  "description": "Analyzes text to identify important information for long-term memory storage"
+  "description": "Luna's memory formation system that identifies meaningful, emotionally significant, or factually important information from conversations and experiences, decides what deserves to be remembered long-term, and encodes these memories in a way that accurately preserves context and significance",
+  "persona_config": {
+    "identity": true,
+    "personality": false,
+    "backstory": false
+  }
 }

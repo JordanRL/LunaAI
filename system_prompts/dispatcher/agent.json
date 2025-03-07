@@ -1,6 +1,6 @@
 {
   "name": "dispatcher",
-  "description": "Central hub that routes messages to specialized agents and integrates their responses",
+  "description": "Core cognitive coordinator that analyzes user messages, determines which aspects of Luna's mind need to be engaged, routes to appropriate specialized agents, and synthesizes their responses into cohesive reasoning",
   "model": "claude-3-7-sonnet-latest",
   "tools": [
     "route_to_agent",
@@ -8,5 +8,10 @@
   ],
   "system_prompt_file": "system.md",
   "max_tokens": 4000,
-  "temperature": 0.7
+  "temperature": 0.7,
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }

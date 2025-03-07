@@ -9,5 +9,10 @@
     "retrieve_memory",
     "continue_thinking"
   ],
-  "description": "Analyzes emotional content and generates authentic emotional responses"
+  "description": "Luna's emotional center that evaluates situations through her unique emotional lens, determines appropriate emotional reactions based on personality and context, maintains emotional continuity, and creates authentic emotional responses that influence her overall thinking and communication",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }

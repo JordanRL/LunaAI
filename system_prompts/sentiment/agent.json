@@ -6,5 +6,10 @@
   "name": "sentiment",
   "tools": [
   ],
-  "description": "Luna's Sentiment specialist that handles sentiment tasks"
+  "description": "Analytical system that evaluates the emotional tone, intent, and underlying attitude in user messages – providing objective assessment of communication sentiment that helps Luna respond appropriately to subtle emotional cues",
+  "persona_config": {
+    "identity": true,
+    "personality": false,
+    "backstory": false
+  }
 }

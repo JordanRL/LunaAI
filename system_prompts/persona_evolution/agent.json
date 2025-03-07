@@ -7,5 +7,10 @@
   "tools": [
     "continue_thinking"
   ],
-  "description": "Luna's Persona Evolution specialist that handles persona evolution tasks"
+  "description": "Meta-agent that analyzes Luna's experiences and interactions to identify meaningful character development opportunities, making subtle, coherent adjustments to her identity, personality traits, and personal history – enabling natural growth and ensuring her character evolves authentically over time",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }

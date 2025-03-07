@@ -10,5 +10,10 @@
     "write_memory",
     "update_relationship"
   ],
-  "description": "Luna's Relationship Manager specialist that handles relationship manager tasks"
+  "description": "Manages Luna's social understanding by tracking relationship development with users, interpreting social dynamics, maintaining awareness of how relationships evolve over time, and informing responses based on relationship context – enabling Luna to form authentic connections with distinct relationship stages and history",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }

@@ -8,5 +8,10 @@
     "process_inner_thought",
     "continue_thinking"
   ],
-  "description": "Generates Luna's complex internal thoughts and mental processing"
+  "description": "Produces Luna's rich inner monologue, allowing her to process complex thoughts, explore tangential ideas, work through confusion, examine her own values, or reflect on matters unrelated to the immediate conversation – providing the space for authentic cognitive exploration that humans experience",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }

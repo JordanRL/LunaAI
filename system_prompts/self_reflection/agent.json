@@ -7,5 +7,10 @@
   "tools": [
     "continue_thinking"
   ],
-  "description": "Luna's Self Reflection specialist that handles self reflection tasks"
+  "description": "Luna's metacognitive capacity for examining her own thoughts, beliefs, values, and reactions – providing deeper understanding of her own mental processes, generating insights about her identity and behavior, and supporting personal growth through critical self-analysis",
+  "persona_config": {
+    "identity": true,
+    "personality": true,
+    "backstory": true
+  }
 }
