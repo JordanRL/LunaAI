@@ -14,5 +14,6 @@
     "identity": true,
     "personality": true,
     "backstory": true
-  }
+  },
+  "emotion_block": true
 }

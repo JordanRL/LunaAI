@@ -4,6 +4,7 @@ Hub implementation for Luna.
 This module defines the hub implementation for Luna's hub-based architecture,
 where the dispatcher serves as the central coordinator for all agent communication.
 """
+import datetime
 import json
 from typing import Dict, List, Any, Optional
 
@@ -38,8 +39,9 @@ class LunaHub:
             console_adapter: ConsoleAdapter,
             conversation_service: ConversationService,
             emotion_service: EmotionService,
-            prompt_service: Optional[PromptService] = None,
-            user_service: UserService = None,
+            prompt_service: PromptService,
+            user_service: UserService,
+            memory_service=None
     ):
         """
         Initialize the Luna hub system.
@@ -50,6 +52,7 @@ class LunaHub:
             emotion_service: Service for managing emotional state
             prompt_service: Service for managing system prompts
             user_service: Service for managing user information
+            memory_service: Optional service for memory operations
         """
         self.execution_stats = {
             "total_tokens": 0,
@@ -63,8 +66,9 @@ class LunaHub:
         # Services
         self.conversation_service = conversation_service
         self.emotion_service = emotion_service
-        self.prompt_service = prompt_service or PromptService()
+        self.prompt_service = prompt_service
         self.user_service = user_service
+        self.memory_service = memory_service
 
         self.app_config = get_app_config()
         
@@ -121,7 +125,7 @@ class LunaHub:
             
             try:
                 # Load and preprocess the system prompt using PromptService
-                raw_prompt = self.prompt_service.load_raw_prompt(agent_name)
+                self.prompt_service.load_raw_prompt(agent_name)
                 system_prompt = self.prompt_service.preprocess_prompt(agent_name, agent_config_data)
             except FileNotFoundError:
                 # Skip this agent if no system prompt is found
@@ -145,13 +149,16 @@ class LunaHub:
                 system_prompt=system_prompt,  # This is now the preprocessed prompt
                 tools=tools,
                 max_tokens=agent_config_data.get("max_tokens", 4000),
-                temperature=agent_config_data.get("temperature", 0.7)
+                temperature=agent_config_data.get("temperature", 0.7),
+                description=agent_config_data.get("description", None),
+                persona_config=agent_config_data.get("persona_config", []),
             )
             
             # Create Agent instance
             agent = Agent(
                 config=agent_config,
-                api_adapter=api_adapter
+                api_adapter=api_adapter,
+                prompt_service=self.prompt_service,
             )
             
             # Store in agents dictionary
@@ -165,12 +172,15 @@ class LunaHub:
         This method dynamically discovers and loads all tools defined in the 
         domain/tools folder without requiring a hardcoded list. It then stores 
         them in the self.tools property as an instance of the ToolRegistry class.
+        
+        If a memory service is provided during hub initialization, it will be 
+        assigned to all memory-related tools.
         """
         import importlib
         import inspect
         import pkgutil
         import domain.tools
-        from domain.models.tool import Tool, ToolRegistry
+        from domain.models.tool import Tool, ToolCategory, ToolRegistry
         
         # Initialize the tool registry
         self.tools = ToolRegistry()
@@ -190,6 +200,15 @@ class LunaHub:
                         
                         # Instantiate the tool
                         tool_instance = obj()
+                        
+                        # If this is a memory tool and we have a memory service, set it
+                        if (self.memory_service and 
+                            hasattr(tool_instance, 'category') and
+                            tool_instance.category == ToolCategory.MEMORY and
+                            hasattr(tool_instance, 'set_memory_service')):
+                            
+                            # Set the memory service
+                            tool_instance.set_memory_service(self.memory_service)
                         
                         # Register the tool in the registry
                         self.tools.register(tool_instance)
@@ -225,7 +244,7 @@ class LunaHub:
         commands = self._handle_command(user_message)
 
         if not commands:
-            raise SystemExit("Time to quit. Goodbye!")
+            exit("Time to quit. Goodbye!")
 
         # Get conversation ID
         conversation_id = self.conversation_service.get_conversation_id_by_user_id(user_id)
@@ -236,42 +255,14 @@ class LunaHub:
         # Store user message in conversation
         self.conversation_service.add_user_message(conversation_id, MessageContent.make_text(user_message))
         
-        # Get user profile
-        user_profile = self.user_service.get_user_profile(user_id)
-        user_profile_str = str(user_profile.to_dict()) if user_profile else None
-        
-        # Get emotional state
-        emotional_state = self.emotion_service.get_current_state()
-        emotion_label = self.emotion_service.get_emotion_label()
-        
-        emotional_state_dict = None
-        if emotional_state:
-            emotional_state_dict = {
-                "pleasure": emotional_state.pleasure,
-                "arousal": emotional_state.arousal,
-                "dominance": emotional_state.dominance,
-                "descriptor": emotion_label
-            }
-        
         # Create context message for dispatcher
         context_message = self._build_context_message(user_message, user_id)
-        
-        # Get appropriate working memory for this conversation turn
-        # This is where you'd retrieve memories relevant to this conversation
-        working_memory = self._get_working_memory(user_id, user_message)
-        
-        # Generate intuition from the subconscious agent (if it exists)
-        intuition = self._generate_intuition(user_id, user_message)
         
         # Execute dispatcher agent with token replacements
         dispatcher_response = self.execute_agent(
             agent_name="dispatcher",
             message=context_message,
             conversation_history=self.conversation_service.get_conversation(conversation_id),
-            working_memory=working_memory,
-            user_profile=user_profile_str,
-            emotional_state=emotional_state_dict,
-            intuition=intuition
         )
         
         # Process routing instructions if any
@@ -290,10 +281,6 @@ class LunaHub:
         outputter_response = self.execute_agent(
             agent_name="outputter",
             message=formatted_content,
-            working_memory=working_memory,
-            user_profile=user_profile_str,
-            emotional_state=emotional_state_dict,
-            intuition=intuition
         )
         
         final_response = outputter_response.message.content[-1]
@@ -321,10 +308,7 @@ class LunaHub:
             message: str|MessageContent|List[MessageContent],
             conversation_history: Optional[List[Dict[str, Any]]] = None,
             suppress_thinking: bool = False,
-            working_memory: Optional[str] = None,
-            user_profile: Optional[str] = None,
-            emotional_state: Optional[Dict[str, Any]] = None,
-            intuition: Optional[str] = None,
+            token_replacements: Optional[Dict[str, str]] = None,
     ) -> AgentResponse:
         """
         Execute a specific agent with proper context management.
@@ -334,10 +318,7 @@ class LunaHub:
             message: Input message for the agent
             conversation_history: Optional history to include
             suppress_thinking: Whether to suppress the thinking message for this agent
-            working_memory: Optional working memory to include in the system prompt
-            user_profile: Optional user profile to include in the system prompt
-            emotional_state: Optional emotional state to include in the system prompt
-            intuition: Optional intuition to include in the system prompt
+            token_replacements: Optional dictionary of token replacements to use for this agent's system prompt
             
         Returns:
             The final AgentResponse after all tool processing
@@ -347,31 +328,20 @@ class LunaHub:
             raise ValueError(f"Agent {agent_name} not found")
         
         agent = self.agents[agent_name]
+        token_replacements = token_replacements or {}
         
-        # If no emotional state is provided, get the current one from emotion_service
-        if emotional_state is None and hasattr(self, 'emotion_service'):
-            current_state = self.emotion_service.get_current_state()
-            if current_state:
-                emotional_state = {
-                    "pleasure": current_state.pleasure,
-                    "arousal": current_state.arousal,
-                    "dominance": current_state.dominance,
-                    "descriptor": self.emotion_service.get_emotion_label()
-                }
-        
-        # If no user profile is provided but we have a user ID, get it from user_service
-        if user_profile is None and conversation_history and hasattr(self, 'user_service'):
-            # Try to extract user ID from conversation history
-            # This implementation depends on your conversation history structure
-            pass
+        # Fill in emotional state tokens if the agent needs it
+        if agent.config.emotion_block:
+            emotional_state = self.emotion_service.get_current_state()
+            token_replacements["PAD_PLEASURE"] = emotional_state.pleasure.__str__()
+            token_replacements["PAD_AROUSAL"] = emotional_state.arousal.__str__()
+            token_replacements["PAD_DOMINANCE"] = emotional_state.dominance.__str__()
+            token_replacements["PAD_DESCRIPTOR"] = self.emotion_service.get_emotion_label()
         
         # Compile the system prompt with dynamic token replacement
         compiled_prompt = self.prompt_service.compile_prompt(
             agent_name=agent_name,
-            working_memory=working_memory,
-            user_profile=user_profile,
-            emotional_state=emotional_state,
-            intuition=intuition
+            token_replacements=token_replacements,
         )
         
         # Update the agent's system prompt with the compiled version
@@ -399,10 +369,7 @@ class LunaHub:
             max_depth: int = 5,
             conversation_history: Optional[List[Dict[str, Any]]] = None,
             reset_depth_for_agents: bool = True,
-            working_memory: Optional[str] = None,
-            user_profile: Optional[str] = None,
-            emotional_state: Optional[Dict[str, Any]] = None,
-            intuition: Optional[str] = None
+            token_replacements: Optional[Dict[str, str]] = None,
     ) -> AgentResponse:
         """
         Execute a routing instruction with proper tracking.
@@ -413,6 +380,7 @@ class LunaHub:
             max_depth: Maximum routing depth allowed
             conversation_history: Optional history to include
             reset_depth_for_agents: Whether to reset depth counter when routing to a new agent
+            token_replacements: Optional dictionary of token replacements to use for this agent's system prompt
             
         Returns:
             The final response after routing execution
@@ -426,10 +394,7 @@ class LunaHub:
                         error=True
                 ),
                 conversation_history=conversation_history,
-                working_memory=working_memory,
-                user_profile=user_profile,
-                emotional_state=emotional_state,
-                intuition=intuition
+                token_replacements=token_replacements,
             )
         
         # When routing between agents, we can optionally reset the depth counter
@@ -470,10 +435,7 @@ class LunaHub:
                     agent_name=target_agent,
                     message=routed_message,
                     conversation_history=conversation_history,
-                    working_memory=working_memory,
-                    user_profile=user_profile,
-                    emotional_state=emotional_state,
-                    intuition=intuition
+                    token_replacements=token_replacements,
                 )
 
                 # If target agent is using tools, process those
@@ -487,10 +449,7 @@ class LunaHub:
                             max_depth=max_depth,
                             conversation_history=conversation_history,
                             reset_depth_for_agents=reset_depth_for_agents,
-                            working_memory=working_memory,
-                            user_profile=user_profile,
-                            emotional_state=emotional_state,
-                            intuition=intuition
+                            token_replacements=token_replacements,
                         )
                         # Format result for source agent
                         routing_result = {
@@ -579,10 +538,7 @@ class LunaHub:
             agent_name=routing.source_agent.value,
             message=tool_response,
             conversation_history=conversation_history,
-            working_memory=working_memory,
-            user_profile=user_profile,
-            emotional_state=emotional_state,
-            intuition=intuition
+            token_replacements=token_replacements,
         )
         
         # If source agent is using more tools, process those
@@ -594,10 +550,7 @@ class LunaHub:
                     conversation_history=conversation_history,
                     max_depth=max_depth,
                     reset_depth_for_agents=False,
-                    working_memory=working_memory,
-                    user_profile=user_profile,
-                    emotional_state=emotional_state,
-                    intuition=intuition
+                    token_replacements=token_replacements,
                 )
         
         return final_response
@@ -612,36 +565,9 @@ class LunaHub:
         Returns:
             Formatted context message
         """
-        # Format memories if available
-        memories_formatted = ""
         
         # Create the context message
-        context_message = f"""
-        ## User Message
-        {user_message}
-        
-        ## User ID
-        {user_id}
-        
-        ## User Profile
-        {self.user_service.get_user_profile(user_id).to_dict()}
-        """
-        
-        # Add emotional state
-        emotional_state = self.emotion_service.get_current_state()
-        relative_state = self.emotion_service.get_relative_state()
-        emotion_label = self.emotion_service.get_emotion_label()
-        
-        context_message += f"""
-        ## Emotional State
-        Current: {emotional_state.to_dict()}
-        Relative to baseline: {relative_state}
-        Emotion label: {emotion_label}
-        """
-        
-        # Add memories if available
-        if memories_formatted:
-            context_message += f"\n\n{memories_formatted}"
+        context_message = f"<UserMessage>\n{user_message}\n</UserMessage>\n<UserID>\n{user_id}\n</UserID>"
         
         return context_message
     
@@ -687,63 +613,24 @@ class LunaHub:
         # For now, just return a simple message
         return "No specific memories have been retrieved at this time."
     
-    def _process_heartbeat(self, heartbeat_message: str, user_id: str) -> str:
+    def _process_heartbeat(self) -> str:
         """
         Process a heartbeat message.
         
         Heartbeat messages allow Luna to think autonomously without direct user input.
         These are periodic events where Luna can reflect, grow, and evolve.
-        
-        Args:
-            heartbeat_message: The heartbeat message with timestamp
-            user_id: The user's ID
             
         Returns:
             Response message (typically empty as heartbeats don't produce user-visible output)
         """
-        # Get user profile
-        user_profile = self.user_service.get_user_profile(user_id)
-        user_profile_str = str(user_profile.to_dict()) if user_profile else None
-        
-        # Get emotional state
-        emotional_state = self.emotion_service.get_current_state()
-        emotion_label = self.emotion_service.get_emotion_label()
-        
-        emotional_state_dict = None
-        if emotional_state:
-            emotional_state_dict = {
-                "pleasure": emotional_state.pleasure,
-                "arousal": emotional_state.arousal,
-                "dominance": emotional_state.dominance,
-                "descriptor": emotion_label
-            }
-        
-        # Get working memory
-        working_memory = self._get_working_memory(user_id, heartbeat_message)
-        
-        # Generate intuition
-        intuition = self._generate_intuition(user_id, heartbeat_message)
         
         # Create a context message for the heartbeat
-        context_message = f"""
-        ## Heartbeat Event
-        {heartbeat_message}
-        
-        ## User Profile
-        {user_profile_str if user_profile_str else "No user profile available."}
-        
-        ## Emotional State
-        {emotional_state_dict if emotional_state_dict else "No emotional state available."}
-        """
+        context_message = "[HEARTBEAT] Timestamp: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Execute the dispatcher agent for the heartbeat
         dispatcher_response = self.execute_agent(
             agent_name="dispatcher",
             message=context_message,
-            working_memory=working_memory,
-            user_profile=user_profile_str,
-            emotional_state=emotional_state_dict,
-            intuition=intuition
         )
         
         # Process routing instructions if any
@@ -753,10 +640,6 @@ class LunaHub:
                     routing=route,
                     depth=0,
                     max_depth=6,
-                    working_memory=working_memory,
-                    user_profile=user_profile_str,
-                    emotional_state=emotional_state_dict,
-                    intuition=intuition
                 )
         
         # Store the heartbeat thought in memory

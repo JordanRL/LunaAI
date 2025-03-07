@@ -10,6 +10,9 @@ import os
 import re
 from typing import Dict, Any, Optional
 
+from domain.models.agent import AgentConfig
+
+
 class PromptService:
     """
     Service for managing system prompt token replacement.
@@ -57,13 +60,9 @@ class PromptService:
         # Determine file path - first try XML, then fall back to MD
         system_prompts_dir = os.path.join(self.project_root, "system_prompts", agent_name)
         xml_path = os.path.join(system_prompts_dir, "system.xml")
-        md_path = os.path.join(system_prompts_dir, "system.md")
         
         if os.path.exists(xml_path):
             with open(xml_path, 'r') as file:
-                prompt = file.read()
-        elif os.path.exists(md_path):
-            with open(md_path, 'r') as file:
                 prompt = file.read()
         else:
             raise FileNotFoundError(f"No system prompt found for agent {agent_name}")
@@ -72,60 +71,48 @@ class PromptService:
         self.raw_prompts[agent_name] = prompt
         return prompt
     
-    def preprocess_prompt(self, agent_name: str, agent_config: Dict[str, Any]) -> str:
+    def preprocess_prompt(self, agent_config: AgentConfig, token_replacements: Dict[str, Any]) -> str:
         """
         Preprocess a system prompt by replacing relatively stable tokens.
         
         Args:
-            agent_name: Name of the agent
-            agent_config: Agent configuration data from agent.json
+            agent_config: Agent configuration
+            token_replacements: Tokens to replace
             
         Returns:
             Preprocessed system prompt
         """
         # Load the raw prompt if not already cached
-        if agent_name not in self.raw_prompts:
-            self.load_raw_prompt(agent_name)
+        if agent_config.name.value not in self.raw_prompts:
+            self.load_raw_prompt(agent_config.name.value)
         
-        raw_prompt = self.raw_prompts[agent_name]
+        raw_prompt = self.raw_prompts[agent_config.name.value]
         preprocessed = raw_prompt
         
         # Replace persona information based on agent_config settings
-        persona_config = agent_config.get("persona_config", {})
-        
-        # For each persona file, check if it should be included for this agent
-        for token_name, content in self.persona_files.items():
-            config_key = token_name.lower()
-            if persona_config.get(config_key, False):
-                preprocessed = self._replace_token(preprocessed, token_name, content)
-            else:
-                # If not included, replace with empty string
-                preprocessed = self._replace_token(preprocessed, token_name, "")
+        for persona_file, include in agent_config.persona_config:
+            if include:
+                persona_token = f"PERSONA_{persona_file.upper()}"
+                preprocessed = preprocessed.replace("{" + persona_token + "}", self.persona_files[persona_file])
         
         # Replace user profile information if available
-        # This could be expanded based on the TODO_FEATURES.md specifications
+        preprocessed = preprocessed.replace("{USER_PROFILE}", token_replacements.get("user_profile", ""))
         
         # Cache the preprocessed prompt
-        self.preprocessed_prompts[agent_name] = preprocessed
+        self.preprocessed_prompts[agent_config.name.value] = preprocessed
         return preprocessed
     
     def compile_prompt(
         self, 
         agent_name: str, 
-        working_memory: Optional[str] = None,
-        user_profile: Optional[str] = None,
-        emotional_state: Optional[Dict[str, Any]] = None,
-        intuition: Optional[str] = None
+        token_replacements: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         Compile a system prompt by replacing all dynamic tokens.
         
         Args:
             agent_name: Name of the agent
-            working_memory: Current working memory content
-            user_profile: Current user profile information
-            emotional_state: Current emotional state data
-            intuition: Current intuition content
+            token_replacements: Optional dictionary of token replacements to apply to the system prompt before sending it to the model.
             
         Returns:
             Fully compiled system prompt
@@ -136,36 +123,17 @@ class PromptService:
         
         preprocessed = self.preprocessed_prompts[agent_name]
         compiled = preprocessed
-        
-        # Replace working memory
-        if working_memory is not None:
-            compiled = self._replace_token(compiled, "WORKING_MEMORY", working_memory)
-        else:
-            compiled = self._replace_token(compiled, "WORKING_MEMORY", "No relevant memories at this time.")
-        
-        # Replace user profile
-        if user_profile is not None:
-            compiled = self._replace_token(compiled, "USER_PROFILE", user_profile)
-        else:
-            compiled = self._replace_token(compiled, "USER_PROFILE", "No user profile information available.")
-        
-        # Replace emotional state values
-        if emotional_state is not None:
-            compiled = self._replace_token(compiled, "PAD_PLEASURE", str(emotional_state.get("pleasure", 0.5)))
-            compiled = self._replace_token(compiled, "PAD_AROUSAL", str(emotional_state.get("arousal", 0.5)))
-            compiled = self._replace_token(compiled, "PAD_DOMINANCE", str(emotional_state.get("dominance", 0.5)))
-            compiled = self._replace_token(compiled, "PAD_DESCRIPTOR", emotional_state.get("descriptor", "neutral"))
-        else:
-            compiled = self._replace_token(compiled, "PAD_PLEASURE", "0.5")
-            compiled = self._replace_token(compiled, "PAD_AROUSAL", "0.5")
-            compiled = self._replace_token(compiled, "PAD_DOMINANCE", "0.5")
-            compiled = self._replace_token(compiled, "PAD_DESCRIPTOR", "neutral")
-        
-        # Replace intuition
-        if intuition is not None:
-            compiled = self._replace_token(compiled, "INTUITION", intuition)
-        else:
-            compiled = self._replace_token(compiled, "INTUITION", "No intuitive insights at this time.")
+
+        # Replace all tokens that were passed in
+        for token, replacement in token_replacements.items():
+            compiled = self._replace_token(compiled, token, replacement)
+
+        """
+        We want to replace all the tokens that are left in the prompt with an empty string, but we
+        also want to remove the XML tags that the leftover tokens are enclosed in.
+        """
+        pattern = r"<[^>]*?>.*?\{.*?\}.*?<\/[^>]*?>"
+        compiled = re.sub(pattern, "", compiled)
         
         return compiled
     
