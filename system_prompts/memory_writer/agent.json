@@ -5,7 +5,9 @@
   "temperature": 0.7,
   "name": "memory_writer",
   "tools": [
-    "write_memory"
+    "write_emotional_memory",
+    "write_episodic_memory",
+    "write_semantic_memory"
   ],
   "description": "Luna's memory formation system that identifies meaningful, emotionally significant, or factually important information from conversations and experiences, decides what deserves to be remembered long-term, and encodes these memories in a way that accurately preserves context and significance",
   "persona_config": {

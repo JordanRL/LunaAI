@@ -2,9 +2,8 @@
 Emotion tools for managing Luna's emotional state.
 """
 
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
-
-from debug import DebugLevel, debug_manager, log, log_error
 
 from domain.models.emotion import (
     EmotionAdjustment,
@@ -13,12 +12,13 @@ from domain.models.emotion import (
     EmotionalState,
 )
 from domain.models.tool import Tool, ToolCategory
+from services.emotion_service import EmotionService
 
 
 class EmotionAdjustmentTool(Tool):
     """Tool for adjusting Luna's emotional state."""
 
-    def __init__(self):
+    def __init__(self, emotion_service: EmotionService):
         """Initialize the emotion adjustment tool."""
         super().__init__(
             name="adjust_emotion",
@@ -62,13 +62,10 @@ Use this tool to make meaningful adjustments when events warrant an emotional re
             handler=self.handle,
             category=ToolCategory.EMOTION,
         )
+        self.emotion_service = emotion_service
 
     def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         """Handle emotional adjustment requests."""
-        from emotional_state import get_emotional_state
-
-        emotional_state = get_emotional_state()
-
         # Get adjustments with defaults
         pleasure_adj_str = tool_input.get("pleasure_adjustment", "no_change")
         arousal_adj_str = tool_input.get("arousal_adjustment", "no_change")
@@ -80,43 +77,24 @@ Use this tool to make meaningful adjustments when events warrant an emotional re
         arousal_adj = EmotionAdjustment(arousal_adj_str)
         dominance_adj = EmotionAdjustment(dominance_adj_str)
 
-        # Get numeric values
-        pleasure_value = EmotionAdjustment.to_value(pleasure_adj)
-        arousal_value = EmotionAdjustment.to_value(arousal_adj)
-        dominance_value = EmotionAdjustment.to_value(dominance_adj)
-
-        # Store pre-adjustment values for logging
-        old_state = emotional_state.get_current_state()
-
-        # Apply adjustments with bounds (0.0 to 1.0)
-        emotional_state.pleasure = max(0.0, min(1.0, emotional_state.pleasure + pleasure_value))
-        emotional_state.arousal = max(0.0, min(1.0, emotional_state.arousal + arousal_value))
-        emotional_state.dominance = max(0.0, min(1.0, emotional_state.dominance + dominance_value))
-
-        # Log the change
-        log(
-            f"Emotion adjusted: P:{old_state['pleasure']:.2f}→{emotional_state.pleasure:.2f} "
-            f"A:{old_state['arousal']:.2f}→{emotional_state.arousal:.2f} "
-            f"D:{old_state['dominance']:.2f}→{emotional_state.dominance:.2f}",
-            DebugLevel.STANDARD,
-            debug_manager.symbols.PROCESSING,
+        # Create emotion adjustment request
+        emotion_adjustment_request = EmotionAdjustmentRequest(
+            pleasure_adjustment=pleasure_adj,
+            arousal_adjustment=arousal_adj,
+            dominance_adjustment=dominance_adj,
+            reason=reason,
         )
-        log(f"Reason: {reason[:100]}", DebugLevel.STANDARD)
 
-        # Record in history
-        emotional_state.record_state(reason)
-
-        # Get human-readable emotion label
-        emotion_label = emotional_state.get_emotion_label()
+        self.emotion_service.adjust_emotion(emotion_adjustment_request)
 
         # Return current emotional state and interpretation
         return {
-            "current_emotional_state": emotional_state.get_current_state(),
-            "relative_to_baseline": emotional_state.get_relative_state(),
-            "emotion_label": emotion_label,
+            "current_emotional_state": self.emotion_service.get_current_state(),
+            "relative_to_baseline": self.emotion_service.get_relative_state(),
+            "emotion_label": self.emotion_service.get_emotion_label(),
             "changes": {
-                "pleasure": emotional_state.pleasure - old_state["pleasure"],
-                "arousal": emotional_state.arousal - old_state["arousal"],
-                "dominance": emotional_state.dominance - old_state["dominance"],
+                "pleasure": EmotionAdjustment.to_value(pleasure_adj),
+                "arousal": EmotionAdjustment.to_value(arousal_adj),
+                "dominance": EmotionAdjustment.to_value(dominance_adj),
             },
         }

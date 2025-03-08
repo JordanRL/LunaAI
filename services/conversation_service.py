@@ -75,18 +75,6 @@ class ConversationService:
             conversation_id=conversation_id, user_id=user_id, start_time=datetime.now()
         )
 
-        # Add system introduction message if appropriate
-        if is_new_user:
-            # Add personalized intro for new users
-            conversation.add_system_message(
-                f"Starting new conversation with user {user_id}. This is their first interaction."
-            )
-        else:
-            # Add generic system message for returning users
-            conversation.add_system_message(
-                f"Continuing conversation with returning user {user_id}."
-            )
-
         # Store the conversation
         self.conversations[conversation_id] = conversation
 

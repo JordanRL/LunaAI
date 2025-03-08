@@ -1,13 +1,12 @@
 """
 Memory-related tools for storing and retrieving memories from Luna's memory store.
-This file contains the general-purpose memory read tool that can work with any memory type.
+This file contains the general-purpose memory read tool that can work with any memory type,
+as well as administrative tools for manually recording memories.
 Specialized tools for specific memory types are in separate modules.
 """
 
 import traceback
 from typing import Any, Dict, List, Optional
-
-from debug import DebugLevel, debug_manager, log, log_error
 
 from domain.models.emotion import EmotionalState
 from domain.models.memory import (
@@ -123,34 +122,14 @@ Query effectively by:
             user_id = tool_input.get("user_id")
             keywords = tool_input.get("keywords")
 
-            log(
-                f"Memory query: '{query_text}' | Type: {memory_type} | Limit: {limit}",
-                DebugLevel.STANDARD,
-                debug_manager.symbols.MEMORY,
-            )
-
             # Check if memory service is available
             if not self.memory_service:
-                log_error("Memory service is not available", "memory_tool")
                 return {
                     "memories": [],
                     "query": query_text,
                     "total_found": 0,
                     "error": "Memory service is not available. The memory system may not be initialized yet.",
                 }
-
-            # Log additional details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                filter_details = []
-                if user_id:
-                    filter_details.append(f"user_id: {user_id}")
-                if importance_threshold:
-                    filter_details.append(f"importance: ≥{importance_threshold}")
-                if keywords:
-                    filter_details.append(f"keywords: [{', '.join(keywords)}]")
-
-                if filter_details:
-                    log(f"  Filters: {', '.join(filter_details)}", DebugLevel.VERBOSE)
 
             # Create a query object
             query = MemoryQuery(
@@ -164,14 +143,6 @@ Query effectively by:
 
             # Execute the query using memory service
             result = self.memory_service.retrieve_memories(query)
-
-            # Process the query results
-            memory_count = len(result.memories)
-            log(
-                f"Found {memory_count} memories matching '{query_text}'",
-                DebugLevel.STANDARD,
-                debug_manager.symbols.SUCCESS,
-            )
 
             # Format memories for response
             memories_list = []
@@ -217,21 +188,6 @@ Query effectively by:
 
                 memories_list.append(memory_dict)
 
-            # Show memory previews in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE) and memories_list:
-                log("Memory results:", DebugLevel.VERBOSE)
-                for i, memory in enumerate(memories_list[:3]):  # Show up to 3 memories
-                    content_preview = debug_manager.truncate_content(memory.get("content", ""), 120)
-                    memory_type = memory.get("type", "unknown")
-                    importance = memory.get("importance", 5)
-                    log(
-                        f"  {i+1}. [{memory_type}] {content_preview} (importance: {importance})",
-                        DebugLevel.VERBOSE,
-                    )
-
-                if len(memories_list) > 3:
-                    log(f"  ... and {len(memories_list) - 3} more", DebugLevel.VERBOSE)
-
             # Return the result
             response = {
                 "memories": memories_list,
@@ -246,16 +202,6 @@ Query effectively by:
             return response
 
         except Exception as e:
-            error_msg = f"Error retrieving memories: {str(e)}"
-            log_error(error_msg, "memory_retrieval")
-
-            # Show more details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                trace = traceback.format_exc()
-                log("Exception traceback:", DebugLevel.VERBOSE, debug_manager.symbols.ERROR)
-                for line in trace.split("\n"):
-                    log(f"  {line}", DebugLevel.VERBOSE)
-
             # Return empty result on error
             return {
                 "memories": [],

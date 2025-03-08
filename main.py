@@ -1,5 +1,3 @@
-from rich.prompt import Prompt
-
 from adapters.console_adapter import ConsoleAdapter
 from adapters.elasticsearch_adapter import ElasticsearchAdapter
 from adapters.logging_adapter import LoggingAdapter
@@ -12,7 +10,8 @@ from services.user_service import UserService
 
 def main():
     console_adapter = ConsoleAdapter()
-    user_service = UserService()
+    es_adapter = ElasticsearchAdapter()
+    user_service = UserService(es_adapter)
     conversation_service = ConversationService(user_service)
     emotion_service = EmotionService()
     logging_adapter = LoggingAdapter
@@ -23,8 +22,7 @@ def main():
     prompt_service = PromptService()
 
     try:
-        # Try to initialize the Elasticsearch adapter and MemoryService
-        es_adapter = ElasticsearchAdapter()
+        # Try to initialize the MemoryService
         memory_service = MemoryService(es_adapter)
         print("Memory service initialized successfully")
     except Exception as e:

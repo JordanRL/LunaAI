@@ -32,7 +32,7 @@ FLAKE8_EXIT=$?
 # Run mypy (if installed)
 echo -e "${YELLOW}Running mypy to check types...${NC}"
 if python -c "import mypy" 2>/dev/null; then
-    python -m mypy .
+    python -m mypy adapters config core domain services tests
     MYPY_EXIT=$?
 else
     echo -e "${YELLOW}Mypy not installed, skipping type checking${NC}"

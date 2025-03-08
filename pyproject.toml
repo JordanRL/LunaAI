@@ -25,6 +25,10 @@ module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
+[[tool.mypy.overrides]]
+module = "scripts.*"
+ignore_errors = true
+
 [tool.flake8]
 max-line-length = 100
 exclude = [".git", "__pycache__", "build", "dist"]

@@ -9,7 +9,7 @@ import os
 
 from dotenv import load_dotenv
 
-from domain.models.config import APIKeys, AppConfig, DebugLevel
+from domain.models.config import APIKeys, AppConfig
 
 # Load environment variables if .env file exists
 if os.path.exists(".env"):
@@ -36,18 +36,9 @@ def get_app_config() -> AppConfig:
     Returns:
         AppConfig: Application configuration
     """
-    # Parse debug level from environment
-    debug_level_str = os.getenv("DEBUG_LEVEL", "none").lower()
-    try:
-        debug_level = DebugLevel(debug_level_str)
-    except ValueError:
-        debug_level = DebugLevel.NONE
-
     return AppConfig(
         default_model=os.getenv("DEFAULT_MODEL", "claude-3-7-sonnet-latest"),
-        chroma_db_path=os.getenv("CHROMA_DB_PATH", "chroma_db"),
-        show_inner_thoughts=os.getenv("SHOW_INNER_THOUGHTS", "True").lower() == "true",
-        log_inner_thoughts=os.getenv("LOG_INNER_THOUGHTS", "False").lower() == "true",
-        inner_thoughts_log_path=os.getenv("INNER_THOUGHTS_LOG_PATH", "logs/luna_debug.log"),
-        debug_level=debug_level,
+        elasticsearch_url=os.getenv("ELASTICSEARCH_URL", "http://localhost:9200"),
+        show_agent_thinking=os.getenv("SHOW_AGENT_THINKING", "True").lower() == "true",
+        logs_path=os.getenv("LOGS_PATH", "logs"),
     )

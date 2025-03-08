@@ -5,6 +5,7 @@ This adapter handles console output using Rich, implementing panels
 for different types of content with left, center, and right alignments.
 """
 
+import json
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -333,8 +334,14 @@ class ConsoleAdapter:
             tool_input: Input parameters for the tool
             message: Optional message to display with the tool call
         """
-        # Format tool input as JSON
-        formatted_input = JSON.from_data(tool_input)
+        # Format tool input in a way that ensures it's readable
+        if isinstance(tool_input, dict) and len(tool_input) > 0:
+            # Use JSON formatting with indentation for better readability
+            formatted_input = JSON.from_data(tool_input, indent=2)
+        else:
+            # Fall back to markdown for any non-dict or empty inputs
+            input_json = json.dumps(tool_input, indent=2, default=str)
+            formatted_input = Markdown(f"```json\n{input_json}\n```")
 
         # For tool calls, we want a centered panel
         content = Group(
@@ -347,7 +354,7 @@ class ConsoleAdapter:
             subtitle=f"{source_agent} {self.symbols.DIRECTION_TO} {tool_name}",
             border_style=self.get_agent_style(source_agent),
             padding=(1, 2),
-            width_percentage=0.33,  # 1/3 of screen width
+            width_percentage=0.4,  # Slightly wider than before
             align="center",
         )
         centered_panel = Align.center(tool_panel)
@@ -364,19 +371,63 @@ class ConsoleAdapter:
             tool_name: Name of the tool that was called
             tool_output: Output data from the tool
         """
-        # Format tool output as JSON
-        formatted_output = JSON.from_data(tool_output)
+        # Check for error messages in the tool output
+        is_error = False
+        if isinstance(tool_output, dict):
+            # Various ways errors might be represented
+            is_error = (
+                tool_output.get("is_error", False)
+                or tool_output.get("success", True) is False
+                or "error" in tool_output
+                or tool_output.get("result") == "Tool execution failed"
+            )
+
+        # Format the output based on whether it's an error
+        if is_error:
+            # For errors, use Markdown with word wrap to ensure full visibility
+            error_content = ""
+
+            # Build a properly formatted error message
+            if "error" in tool_output:
+                error_content += f"**Error:** {tool_output['error']}\n\n"
+
+            if "message" in tool_output:
+                error_content += f"**Message:** {tool_output['message']}\n\n"
+
+            if "content" in tool_output:
+                error_content += f"**Content:** {tool_output['content']}\n\n"
+
+            if not error_content and "result" in tool_output:
+                error_content += f"**Result:** {tool_output['result']}\n\n"
+
+            # If we couldn't extract a good error message, just show the whole thing
+            if not error_content:
+                error_content = f"```json\n{json.dumps(tool_output, indent=2)}\n```"
+
+            formatted_output = Markdown(error_content)
+
+            # Title and style for error panels
+            panel_title = f"Tool Error: {tool_name}"
+            panel_style = "red"
+        else:
+            # For success responses, use standard JSON formatting
+            formatted_output = JSON.from_data(tool_output, indent=2)
+            panel_title = f"Tool Response: {tool_name}"
+            panel_style = self.get_agent_style(target_agent)
 
         # For tool responses, we want a centered panel
-        content = Group(Markdown(f"**Tool Response:** {tool_name}"), formatted_output)
+        content = Group(
+            Markdown(f"**Tool {'Error' if is_error else 'Response'}:** {tool_name}"),
+            formatted_output,
+        )
 
         tool_panel = ResponsivePanel(
             content,
-            title=f"Tool Response: {tool_name}",
+            title=panel_title,
             subtitle=f"{target_agent} {self.symbols.DIRECTION_FROM} {tool_name}",
-            border_style=self.get_agent_style(target_agent),
+            border_style=panel_style,
             padding=(1, 2),
-            width_percentage=0.33,  # 1/3 of screen width
+            width_percentage=0.5 if is_error else 0.33,  # Make error panels wider
             align="center",
         )
         centered_panel = Align.center(tool_panel)

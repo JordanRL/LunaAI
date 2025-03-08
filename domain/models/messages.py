@@ -85,14 +85,8 @@ class Message:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation for API."""
-        if self.has_tool_results():
-            for result in self.get_tool_results():
-                if result.is_error is not None:
-                    return {
-                        "role": "user",
-                        "content": [],
-                    }
-
+        # Always return all content, including tool responses with errors
+        # This ensures that the API can match tool_use_id with tool_result blocks
         return {"role": self.role, "content": [item.to_dict() for item in self.content]}
 
     def has_text(self) -> bool:

@@ -45,6 +45,8 @@ class ResponsivePanel:
         # Apply alignment
         if self.align == "right":
             aligned_panel = Align.right(panel)
+        elif self.align == "center":
+            aligned_panel = Align.center(panel)
         else:
             aligned_panel = Align.left(panel)
 

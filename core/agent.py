@@ -47,6 +47,7 @@ class Agent:
         self.config = config
         self.name = config.name
         self.tools = config.tools
+        self.allowed_tools = config.allowed_tools
         self.model = config.model
         self.max_tokens = config.max_tokens
         self.temperature = config.temperature
@@ -80,7 +81,11 @@ class Agent:
         history_copy = deepcopy(self.message_history)
 
         # Prepare message history
-        if external_history.messages is not None and len(external_history.messages) > 0:
+        if (
+            external_history is not None
+            and external_history.messages is not None
+            and len(external_history.messages) > 0
+        ):
             # Only include a limited number of recent messages to avoid context limits
             recent_external = (
                 external_history.messages[-5:]

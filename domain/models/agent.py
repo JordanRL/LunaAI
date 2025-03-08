@@ -85,8 +85,9 @@ class AgentConfig:
     system_prompt: Optional[str] = None
     system_prompt_file: Optional[str] = None
     tools: List[Tool] = field(default_factory=list)
+    allowed_tools: List[str] = field(default_factory=list)
     description: Optional[str] = None
-    persona_config: Optional[List[str]] = None
+    persona_config: Optional[Dict[str, bool]] = None
     emotion_block: bool = False
     max_tokens: int = 4000
     temperature: float = 0.7

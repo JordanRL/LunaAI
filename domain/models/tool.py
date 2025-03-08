@@ -36,7 +36,9 @@ class Tool(Generic[ToolInputType, ToolResultType]):
     name: str
     description: str
     input_schema: Dict[str, Any]
-    handler: Callable[[ToolInputType], ToolResultType]
+    handler: Callable[
+        [Any], ToolResultType
+    ]  # Using Any to support both dict and Anthropic object inputs
     category: Optional[ToolCategory] = None
 
     def to_api_schema(self) -> Dict[str, Any]:
@@ -46,6 +48,45 @@ class Tool(Generic[ToolInputType, ToolResultType]):
             "description": self.description,
             "input_schema": self.input_schema,
         }
+
+    def safe_execute(self, input_data: Any) -> Dict[str, Any]:
+        """
+        Safely execute the tool handler with input type conversion.
+
+        This method provides a standard way to handle tool inputs, converting
+        Anthropic API objects to dictionaries when needed, and catching any
+        exceptions that occur during execution.
+
+        Args:
+            input_data: The input data from the tool call, which may be a dict,
+                       an Anthropic API object, or another type that needs conversion
+
+        Returns:
+            Dict[str, Any]: The result of the tool execution or an error object
+        """
+        try:
+            # Convert to Dict if it's not already (handle both dict and Anthropic input object)
+            if not isinstance(input_data, dict):
+                # Try to convert to dict based on the object type
+                if hasattr(input_data, "__dict__"):
+                    input_data = input_data.__dict__
+                elif hasattr(input_data, "items"):
+                    # If it has items() method, assume it's dict-like
+                    input_data = {k: v for k, v in input_data.items()}
+                elif hasattr(input_data, "keys"):
+                    # Another dict-like approach
+                    input_data = {k: input_data[k] for k in input_data.keys()}
+
+            # Call the handler with the prepared input
+            return self.handler(input_data)
+
+        except Exception as e:
+            # Return a standardized error response
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Error executing {self.name}: {str(e)}",
+            }
 
 
 @dataclass
@@ -131,3 +172,15 @@ class ToolRegistry:
     def get_categories(self) -> Dict[ToolCategory, int]:
         """Get all categories and the number of tools in each"""
         return {cat: len(tools) for cat, tools in self.tools_by_category.items() if tools}
+
+    def __contains__(self, tool_name: str) -> bool:
+        """
+        Support for the 'in' operator to check if a tool exists.
+
+        Args:
+            tool_name: The name of the tool to check
+
+        Returns:
+            bool: True if the tool exists in the registry, False otherwise
+        """
+        return tool_name in self.tools

@@ -7,6 +7,7 @@ This service manages the three-stage prompt processing system:
 3. Compiled: The file as it is sent to the agent with all tokens replaced
 """
 
+import json
 import os
 import re
 from typing import Any, Dict, Optional
@@ -93,17 +94,20 @@ class PromptService:
         preprocessed = raw_prompt
 
         # Replace persona information based on agent_config settings
-        for persona_file, include in agent_config.persona_config:
+        for persona_file, include in agent_config.persona_config.items():
             if include:
                 persona_token = f"PERSONA_{persona_file.upper()}"
-                preprocessed = preprocessed.replace(
-                    "{" + persona_token + "}", self.persona_files[persona_file]
+                preprocessed = self._replace_token(
+                    preprocessed, persona_token, self.persona_files[persona_token]
                 )
 
         # Replace user profile information if available
-        preprocessed = preprocessed.replace(
-            "{USER_PROFILE}", token_replacements.get("user_profile", "")
-        )
+        for token, replacement in token_replacements.items():
+            if isinstance(replacement, dict) or isinstance(replacement, list):
+                replacement = json.dumps(replacement)
+            elif not isinstance(replacement, str):
+                replacement = str(replacement)
+            preprocessed = self._replace_token(preprocessed, token, replacement)
 
         # Cache the preprocessed prompt
         self.preprocessed_prompts[agent_config.name.value] = preprocessed
@@ -139,8 +143,33 @@ class PromptService:
         We want to replace all the tokens that are left in the prompt with an empty string, but we
         also want to remove the XML tags that the leftover tokens are enclosed in.
         """
-        pattern = r"<[^>]*?>.*?\{.*?\}.*?<\/[^>]*?>"
-        compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{PAD_PLEASURE}") != -1:
+            pattern = r"<EmotionalState>[\s\S]*?</EmotionalState>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{INTUITION}") != -1:
+            pattern = r"<Intuition>[\s\S]*?</Intuition>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{WORKING_MEMORY}") != -1:
+            pattern = r"<WorkingMemory>[\s\S]*?</WorkingMemory>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{PERSONA_IDENTITY}") != -1:
+            pattern = r"<YourPersonaIdentity>[\s\S]*?</YourPersonaIdentity>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{PERSONA_PERSONALITY}") != -1:
+            pattern = r"<YourPersonality>[\s\S]*?</YourPersonality>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{PERSONA_BACKSTORY}") != -1:
+            pattern = r"<YourBackstoryAndPersonalHistory>[\s\S]*?</YourBackstoryAndPersonalHistory>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{RECENT_MEMORY}") != -1:
+            pattern = r"<RecentMemory>[\s\S]*?</RecentMemory>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{USER_PROFILE}") != -1:
+            pattern = r"<UserProfile>[\s\S]*?</UserProfile>"
+            compiled = re.sub(pattern, "", compiled)
+        if compiled.find("{USER_RELATIONSHIP}") != -1:
+            pattern = r"<UserRelationship>[\s\S]*?</UserRelationship>"
+            compiled = re.sub(pattern, "", compiled)
 
         return compiled
 

@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from domain.models.emotion import EmotionalState
 
@@ -182,7 +182,7 @@ class MemoryQuery:
     """
 
     # Query Parameters
-    query: str
+    query: Optional[str] = None
     memory_type: Optional[str] = None  # None means search all types
     importance_threshold: Optional[int] = None
     user_id: Optional[str] = None
@@ -264,3 +264,17 @@ class MemoryResult:
     total_found: int
     message: Optional[str] = None
     scores: Dict[str, float] = field(default_factory=dict)
+
+    def __iter__(
+        self,
+    ) -> Generator[
+        Memory | EpisodicMemory | EmotionalMemory | SemanticMemory | RelationshipMemory, None, None
+    ]:
+        """
+        Support for the 'in' operator to iterate over memories.
+
+        Returns:
+            bool: True if the tool exists in the registry, False otherwise
+        """
+        for memory in self.memories:
+            yield memory

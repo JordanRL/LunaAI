@@ -6,9 +6,9 @@
   "name": "relationship_manager",
   "tools": [
     "continue_thinking",
-    "retrieve_memory",
-    "write_memory",
-    "update_relationship"
+    "update_relationship",
+    "read_episodic_memory",
+    "read_emotional_memory"
   ],
   "description": "Manages Luna's social understanding by tracking relationship development with users, interpreting social dynamics, maintaining awareness of how relationships evolve over time, and informing responses based on relationship context – enabling Luna to form authentic connections with distinct relationship stages and history",
   "persona_config": {
@@ -16,5 +16,7 @@
     "personality": true,
     "backstory": true
   },
-  "emotion_block": false
+  "emotion_block": false,
+  "recent_memory": true,
+  "user_relationship": true
 }

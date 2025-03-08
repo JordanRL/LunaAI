@@ -67,8 +67,8 @@ class UserService:
         if profile is not None:
             # User exists, retrieve relationship
             relationship = self.elasticsearch_adapter.get_user_relationship(user_id)
-            relationship_data = relationship.model_dump() if relationship else None
-            return False, profile, relationship_data
+            relationship = relationship if relationship else None
+            return False, profile, relationship
 
         # Create new user profile
         profile = UserProfile(user_id=user_id)

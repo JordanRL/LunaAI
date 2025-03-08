@@ -3,18 +3,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
-class DebugLevel(Enum):
-    """
-    Debug verbosity levels.
-    """
-
-    NONE = "none"  # No debug output
-    MINIMAL = "minimal"  # Basic info only (agent transitions, errors)
-    STANDARD = "standard"  # Normal debug info (content snippets, stats)
-    VERBOSE = "verbose"  # Detailed output (routing paths, content previews)
-    TRACE = "trace"  # Full trace (message contents, execution flow)
-
-
 @dataclass
 class AppConfig:
     """
@@ -22,19 +10,15 @@ class AppConfig:
 
     Attributes:
         default_model: Default model to use
-        chroma_db_path: Path to ChromaDB storage
-        show_inner_thoughts: Whether to display Luna's inner thoughts
-        log_inner_thoughts: Whether to log inner thoughts to file
-        inner_thoughts_log_path: Path for logging inner thoughts
-        debug_level: Current debug level
+        elasticsearch_url: URL for Elasticsearch server
+        show_agent_thinking: Whether to display agents' thinking processes
+        logs_path: Path for application logs
     """
 
     default_model: str = "claude-3-7-sonnet-latest"
-    chroma_db_path: str = "chroma_db"
-    show_inner_thoughts: bool = True
-    log_inner_thoughts: bool = False
-    inner_thoughts_log_path: str = "logs/luna_debug.log"
-    debug_level: DebugLevel = DebugLevel.NONE
+    elasticsearch_url: str = "http://localhost:9200"
+    show_agent_thinking: bool = True
+    logs_path: str = "logs"
 
 
 @dataclass
@@ -99,7 +83,7 @@ class LunaMemoriesIndexSchema:
         mappings: Type mappings for the index
     """
 
-    index_name: str = "luna_memories"
+    index_name: str = "luna-memories"
     mappings: Dict[str, Any] = field(
         default_factory=lambda: {
             "properties": {
@@ -196,7 +180,7 @@ class UserProfileIndexSchema:
         mappings: Type mappings for the index
     """
 
-    index_name: str = "luna_user_profiles"
+    index_name: str = "luna-user-profiles"
     mappings: Dict[str, Any] = field(
         default_factory=lambda: {
             "properties": {
@@ -466,7 +450,7 @@ class UserRelationshipIndexSchema:
         mappings: Type mappings for the index
     """
 
-    index_name: str = "luna_user_relationships"
+    index_name: str = "luna-user-relationships"
     mappings: Dict[str, Any] = field(
         default_factory=lambda: {
             "properties": {

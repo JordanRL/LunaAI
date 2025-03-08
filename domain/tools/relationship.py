@@ -257,10 +257,50 @@ See the full schema for additional fields that can be used to provide detailed r
             category=ToolCategory.RELATIONSHIP,
         )
 
-    def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+    def handle(self, tool_input: Any) -> Dict[str, Any]:
         """Process a relationship update request."""
+        # Debug information about the input type
+        input_type = type(tool_input).__name__
+
+        # Convert to Dict if it's not already (handle both dict and Anthropic input object)
+        if not isinstance(tool_input, dict):
+            try:
+                # Try to convert to dict if it has a __dict__ attribute
+                if hasattr(tool_input, "__dict__"):
+                    tool_input = tool_input.__dict__
+                # If it has items() method, assume it's dict-like
+                elif hasattr(tool_input, "items"):
+                    tool_input = {k: v for k, v in tool_input.items()}
+                # If it seems to be a simple object
+                elif hasattr(tool_input, "user_id"):
+                    user_id = tool_input.user_id
+                    tool_input = {"user_id": user_id}
+                else:
+                    # Return an error if we can't convert input to dict
+                    return {
+                        "success": False,
+                        "message": f"Invalid input type: {input_type}. Expected a dictionary.",
+                        "error": f"Invalid input type: {input_type}",
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"Error converting input type {input_type} to dictionary: {str(e)}",
+                    "error": str(e),
+                }
+
+        # Now extract fields from the dictionary
         user_id = tool_input.get("user_id", "")
         relationship_update = tool_input.get("relationship_update", "")
+
+        # Check if user_service is available
+        if not hasattr(self, "user_service") or self.user_service is None:
+            return {
+                "success": False,
+                "user_id": user_id,
+                "message": "UserService is not available. Cannot update relationship.",
+                "error": "Missing dependency: UserService not injected into RelationshipUpdateTool",
+            }
 
         try:
             # Create relationship update request directly from tool_input
@@ -298,9 +338,10 @@ See the full schema for additional fields that can be used to provide detailed r
             }
 
             return result
-        except Exception:
+        except Exception as e:
             return {
                 "success": False,
                 "user_id": user_id,
-                "message": "Failed to update relationship",
+                "message": f"Failed to update relationship: {str(e)}",
+                "error": str(e),
             }

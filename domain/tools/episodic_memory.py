@@ -5,8 +5,6 @@ Specialized tools for working with episodic memories in Luna's memory system.
 import traceback
 from typing import Any, Dict, List, Optional
 
-from debug import DebugLevel, debug_manager, log, log_error
-
 from domain.models.emotion import EmotionalState
 from domain.models.memory import EpisodicMemory, EpisodicMemoryQuery, MemoryResult
 from domain.models.tool import Tool, ToolCategory
@@ -112,38 +110,14 @@ Query effectively by:
             context = tool_input.get("context")
             keywords = tool_input.get("keywords")
 
-            log(
-                f"Episodic memory query: '{query_text}' | Limit: {limit}",
-                DebugLevel.STANDARD,
-                debug_manager.symbols.MEMORY,
-            )
-
             # Check if memory service is available
             if not self.memory_service:
-                log_error("Memory service is not available", "episodic_memory_tool")
                 return {
                     "memories": [],
                     "query": query_text,
                     "total_found": 0,
                     "error": "Memory service is not available. The memory system may not be initialized yet.",
                 }
-
-            # Log additional details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                filter_details = []
-                if user_id:
-                    filter_details.append(f"user_id: {user_id}")
-                if importance_threshold:
-                    filter_details.append(f"importance: ≥{importance_threshold}")
-                if participants:
-                    filter_details.append(f"participants: [{', '.join(participants)}]")
-                if context:
-                    filter_details.append(f"context: {context}")
-                if keywords:
-                    filter_details.append(f"keywords: [{', '.join(keywords)}]")
-
-                if filter_details:
-                    log(f"  Filters: {', '.join(filter_details)}", DebugLevel.VERBOSE)
 
             # Create a specialized episodic memory query
             query = EpisodicMemoryQuery(
@@ -158,14 +132,6 @@ Query effectively by:
 
             # Execute the query using memory service
             result = self.memory_service.retrieve_memories(query)
-
-            # Process the query results
-            memory_count = len(result.memories)
-            log(
-                f"Found {memory_count} episodic memories matching '{query_text}'",
-                DebugLevel.STANDARD,
-                debug_manager.symbols.SUCCESS,
-            )
 
             # Format memories for response
             memories_list = []
@@ -197,20 +163,6 @@ Query effectively by:
 
                 memories_list.append(memory_dict)
 
-            # Show memory previews in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE) and memories_list:
-                log("Episodic memory results:", DebugLevel.VERBOSE)
-                for i, memory in enumerate(memories_list[:3]):  # Show up to 3 memories
-                    content_preview = debug_manager.truncate_content(memory.get("content", ""), 120)
-                    importance = memory.get("importance", 5)
-                    log(
-                        f"  {i+1}. [episodic] {content_preview} (importance: {importance})",
-                        DebugLevel.VERBOSE,
-                    )
-
-                if len(memories_list) > 3:
-                    log(f"  ... and {len(memories_list) - 3} more", DebugLevel.VERBOSE)
-
             # Return the result
             response = {
                 "memories": memories_list,
@@ -224,16 +176,6 @@ Query effectively by:
             return response
 
         except Exception as e:
-            error_msg = f"Error retrieving episodic memories: {str(e)}"
-            log_error(error_msg, "episodic_memory_retrieval")
-
-            # Show more details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                trace = traceback.format_exc()
-                log("Exception traceback:", DebugLevel.VERBOSE, debug_manager.symbols.ERROR)
-                for line in trace.split("\n"):
-                    log(f"  {line}", DebugLevel.VERBOSE)
-
             # Return empty result on error
             return {
                 "memories": [],
@@ -363,7 +305,6 @@ The memory will be stored in Luna's long-term memory for future recall and retri
 
             # Check if memory service is available
             if not self.memory_service:
-                log_error("Memory service is not available", "episodic_memory_tool")
                 return {
                     "success": False,
                     "error": "Memory service is not available. The memory system may not be initialized yet.",
@@ -395,35 +336,6 @@ The memory will be stored in Luna's long-term memory for future recall and retri
             memory_id = self.memory_service.store_memory(memory)
 
             if memory_id:
-                log(
-                    f"Created episodic memory: '{content[:50]}...' | Importance: {importance}/10",
-                    DebugLevel.STANDARD,
-                    debug_manager.symbols.MEMORY,
-                )
-
-                # Show more details in VERBOSE mode
-                if debug_manager.should_debug(DebugLevel.VERBOSE):
-                    details = []
-                    if participants:
-                        details.append(f"Participants: [{', '.join(participants)}]")
-                    if context:
-                        details.append(f"Context: {context}")
-                    if keywords:
-                        details.append(f"Keywords: [{', '.join(keywords)}]")
-                    if emotion:
-                        pad_values = []
-                        if emotion.pleasure is not None:
-                            pad_values.append(f"P:{emotion.pleasure:.2f}")
-                        if emotion.arousal is not None:
-                            pad_values.append(f"A:{emotion.arousal:.2f}")
-                        if emotion.dominance is not None:
-                            pad_values.append(f"D:{emotion.dominance:.2f}")
-                        if pad_values:
-                            details.append(f"Emotion: {' '.join(pad_values)}")
-
-                    if details:
-                        log("  Details: " + " | ".join(details), DebugLevel.VERBOSE)
-
                 return {
                     "success": True,
                     "memory_id": memory_id,
@@ -439,16 +351,6 @@ The memory will be stored in Luna's long-term memory for future recall and retri
                 }
 
         except Exception as e:
-            error_msg = f"Error writing episodic memory: {str(e)}"
-            log_error(error_msg, "episodic_memory_storage")
-
-            # Show more details in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                trace = traceback.format_exc()
-                log("Exception traceback:", DebugLevel.VERBOSE, debug_manager.symbols.ERROR)
-                for line in trace.split("\n"):
-                    log(f"  {line}", DebugLevel.VERBOSE)
-
             return {
                 "success": False,
                 "error": str(e),

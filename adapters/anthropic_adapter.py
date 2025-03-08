@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import anthropic
 from anthropic.types import Message as AnthropicMessage
+from anthropic.types import TextBlock, ToolUseBlock
 
 from domain.models.agent import AgentConfig, AgentResponse
 from domain.models.content import MessageContent, ToolCall
@@ -108,32 +109,34 @@ class AnthropicAdapter:
 
         # Convert each content block to our internal MessageContent format
         for content_item in response.content:
-            content_type = content_item.get("type")
-
-            if content_type == "text":
+            if isinstance(content_item, TextBlock):
                 # Create text content
-                text = content_item.get("text", "")
+                text = content_item.text
                 if primary_text == "":  # Store the first text block as primary text
                     primary_text = text
-                content_blocks.append(MessageContent.text(text))
+                content_blocks.append(MessageContent.make_text(text))
 
-            elif content_type == "tool_call":
+            elif isinstance(content_item, ToolUseBlock):
+                # Convert the input object to a dictionary if needed
+                tool_input = content_item.input
+
+                # If input has a __dict__ attribute (like an Anthropic object), convert it to a regular dict
+                if hasattr(tool_input, "__dict__"):
+                    tool_input = tool_input.__dict__
+                elif hasattr(tool_input, "items"):
+                    # For other dict-like objects, convert to regular dict
+                    tool_input = {k: v for k, v in tool_input.items()}
+
                 # Create tool call content and extract ToolCall for processing
                 tool_call = ToolCall(
-                    tool_name=content_item.get("name", ""),
-                    tool_id=content_item.get("id", ""),
-                    tool_input=content_item.get("input", {}),
+                    tool_name=content_item.name,
+                    tool_id=content_item.id,
+                    tool_input=tool_input,
                 )
                 tool_calls.append(tool_call)
 
                 # Store the tool call content
-                content_blocks.append(
-                    MessageContent.tool_call(
-                        name=content_item.get("name", ""),
-                        input_data=content_item.get("input", {}),
-                        tool_id=content_item.get("id", ""),
-                    )
-                )
+                content_blocks.append(MessageContent.make_tool_call(tool_call=tool_call))
 
         # Create a complete message with all content blocks
         message = Message(role="assistant", content=content_blocks)
@@ -144,8 +147,6 @@ class AnthropicAdapter:
         # Create the agent response
         agent_response = AgentResponse(
             message=message,
-            tool_use_blocks=tool_calls,
-            text_blocks=content_blocks,
             stop_reason=response.stop_reason,
             raw_response=response,
             routing=routing_instructions,

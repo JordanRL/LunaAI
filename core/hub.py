@@ -7,8 +7,10 @@ where the dispatcher serves as the central coordinator for all agent communicati
 
 import datetime
 import json
+import sys
 from typing import Any, Dict, List, Optional
 
+from rich.pretty import Pretty
 from rich.prompt import Prompt
 
 from adapters.console_adapter import ConsoleAdapter
@@ -16,6 +18,7 @@ from config.settings import get_api_keys, get_app_config
 from core.agent import Agent
 from domain.models.agent import AgentResponse
 from domain.models.content import MessageContent, ToolResponse
+from domain.models.memory import EpisodicMemoryQuery, MemoryQuery
 from domain.models.routing import RoutingInstruction
 from domain.models.tool import ToolRegistry
 from services.conversation_service import ConversationService
@@ -102,6 +105,27 @@ class LunaHub:
             os.path.dirname(os.path.dirname(__file__)), "system_prompts"
         )
 
+        recent_memories = self.memory_service.retrieve_memories(
+            EpisodicMemoryQuery(
+                limit=5,
+                user_id="Jordan",
+            )
+        )
+
+        recent_memories_str = ""
+        for memory in recent_memories:
+            recent_memories_str = f"\n<MemoryJSON>\n{json.dumps(memory.to_document())}\n</MemoryJSON>\n{recent_memories_str}"
+
+        created, user_profile, user_relationship = self.user_service.create_or_get_user(
+            user_id="Jordan"
+        )
+
+        token_replacements = {
+            "USER_PROFILE": user_profile.model_dump(mode="json"),
+            "USER_RELATIONSHIP": user_relationship.model_dump(mode="json"),
+            "RECENT_MEMORY": recent_memories_str,
+        }
+
         # Iterate through directories in system_prompts
         for agent_dir in os.listdir(system_prompts_dir):
             agent_path = os.path.join(system_prompts_dir, agent_dir)
@@ -124,10 +148,16 @@ class LunaHub:
             # Create AgentConfig object
             agent_name = agent_config_data.get("name")
 
+            current_token_replacements = token_replacements.copy()
+
+            if not agent_config_data.get("user_relationship"):
+                del current_token_replacements["USER_RELATIONSHIP"]
+            if not agent_config_data.get("recent_memory"):
+                del current_token_replacements["RECENT_MEMORY"]
+
             try:
                 # Load and preprocess the system prompt using PromptService
                 self.prompt_service.load_raw_prompt(agent_name)
-                system_prompt = self.prompt_service.preprocess_prompt(agent_name, agent_config_data)
             except FileNotFoundError:
                 # Skip this agent if no system prompt is found
                 continue
@@ -135,25 +165,32 @@ class LunaHub:
             # Get tools for this agent
             tool_names = agent_config_data.get("tools", [])
             tools = []
+            allowed_tools = []
 
             # After loading tools in _load_tools, populate the tools list
             if hasattr(self, "tools") and self.tools is not None:
                 for tool_name in tool_names:
                     tool = self.tools.get(tool_name)
                     if tool:
+                        allowed_tools.append(tool_name)
                         tools.append(tool)
 
             # Create AgentConfig
             agent_config = AgentConfig(
                 name=AgentType(agent_name),
                 model=agent_config_data.get("model", "claude-3-7-sonnet-latest"),
-                system_prompt=system_prompt,  # This is now the preprocessed prompt
                 tools=tools,
+                allowed_tools=allowed_tools,
                 max_tokens=agent_config_data.get("max_tokens", 4000),
                 temperature=agent_config_data.get("temperature", 0.7),
                 description=agent_config_data.get("description", None),
                 persona_config=agent_config_data.get("persona_config", []),
             )
+
+            system_prompt = self.prompt_service.preprocess_prompt(
+                agent_config, current_token_replacements
+            )
+            agent_config.system_prompt = system_prompt
 
             # Create Agent instance
             agent = Agent(
@@ -198,15 +235,38 @@ class LunaHub:
                 for name, obj in inspect.getmembers(module):
                     # Check if it's a class and is a subclass of Tool but not Tool itself
                     if inspect.isclass(obj) and issubclass(obj, Tool) and obj is not Tool:
-                        # Instantiate the tool
-                        tool_instance = obj()
+                        # Get the signature of the tool's __init__ method to check for service dependencies
+                        init_signature = inspect.signature(obj.__init__)
+                        init_params = {}
 
-                        # If this is a memory tool and we have a memory service, set it
+                        # Check for services in the constructor parameters
+                        for param_name, param in init_signature.parameters.items():
+                            if param_name == "self":
+                                continue
+
+                            # Check if parameter is a service we have
+                            if param_name == "memory_service" and self.memory_service:
+                                init_params[param_name] = self.memory_service
+                            elif param_name == "emotion_service" and self.emotion_service:
+                                init_params[param_name] = self.emotion_service
+                            elif param_name == "user_service" and self.user_service:
+                                init_params[param_name] = self.user_service
+                            elif param_name == "conversation_service" and self.conversation_service:
+                                init_params[param_name] = self.conversation_service
+                            elif param_name == "prompt_service" and self.prompt_service:
+                                init_params[param_name] = self.prompt_service
+
+                        # Instantiate the tool with injected services
+                        tool_instance = obj(**init_params)
+
+                        # For backward compatibility, also check set_* methods
+                        # This handles tools created before we updated the initialization method
                         if (
                             self.memory_service
                             and hasattr(tool_instance, "category")
                             and tool_instance.category == ToolCategory.MEMORY
                             and hasattr(tool_instance, "set_memory_service")
+                            and "memory_service" not in init_params
                         ):
                             # Set the memory service
                             tool_instance.set_memory_service(self.memory_service)
@@ -296,7 +356,9 @@ class LunaHub:
         return outputter_response.message.get_text()
 
     def user_prompt(self):
-        return Prompt(prompt="[bold cyan]You>[/bold cyan] ", console=self.console_adapter.console)
+        return Prompt().ask(
+            prompt="[bold cyan]You>[/bold cyan] ", console=self.console_adapter.console
+        )
 
     def execute_agent(
         self,
@@ -396,6 +458,8 @@ class LunaHub:
         # When routing between agents, we can optionally reset the depth counter
         next_depth = 0 if reset_depth_for_agents else depth + 1
         tool_response = []
+        routing_result = None
+        error_result = None
 
         if routing.is_agent_routing():
             # Route to another agent
@@ -454,7 +518,7 @@ class LunaHub:
                         # Format result for source agent
                         routing_result = {
                             "result": "Routing completed successfully",
-                            "content": target_response.get_text_content(),
+                            "content": target_response_tools.get_text_content(),
                             "target_agent": target_agent,
                         }
 
@@ -499,23 +563,80 @@ class LunaHub:
             tool_name = routing.tool_call.tool_name
 
             # Tool restriction controls
-            if tool_name in self.agents[routing.source_agent.value].tools:
-                # The agent is allowed access to the requested tool so invoke it
-                tool = self.tools.get(tool_name)
-                routing_result = tool.handler(routing.tool_call.tool_input)
+            try:
+                if tool_name in self.tools and hasattr(self.tools.get(tool_name), "handler"):
+                    # The tool exists in the registry
+                    tool = self.tools.get(tool_name)
 
-                # Build the ToolResponse for the tool handler
-                tool_response.append(
-                    ToolResponse(
-                        tool_id=routing.tool_call.tool_id, content=json.dumps(routing_result)
+                    # Check if the agent is allowed to use this tool
+                    if tool_name in self.agents[routing.source_agent.value].allowed_tools:
+                        try:
+                            # Prepare tool input - handle dict-like objects from Anthropic API
+                            tool_input = routing.tool_call.tool_input
+
+                            # Invoke the tool with proper error handling
+                            routing_result = tool.handler(tool_input)
+
+                            # Build the ToolResponse for the tool handler
+                            tool_response.append(
+                                ToolResponse(
+                                    tool_id=routing.tool_call.tool_id,
+                                    content=json.dumps(routing_result),
+                                )
+                            )
+                        except Exception as tool_error:
+                            # Handle any exceptions during tool input preparation or execution
+                            error_result = {
+                                "success": False,
+                                "message": f"Error executing tool {tool_name}: {str(tool_error)}",
+                                "error": str(tool_error),
+                            }
+                            tool_response.append(
+                                ToolResponse(
+                                    tool_id=routing.tool_call.tool_id,
+                                    content=json.dumps(error_result),
+                                    is_error=True,
+                                )
+                            )
+                    else:
+                        # The agent is not allowed access to the requested tool
+                        routing_result = {
+                            "result": "Permission denied",
+                            "tool_name": routing.tool_call.tool_name,
+                            "content": f"The agent {routing.source_agent.value} does not have permission to use the {tool_name} tool.",
+                        }
+
+                        # Build the ToolResponse for the error
+                        tool_response.append(
+                            ToolResponse(
+                                tool_id=routing.tool_call.tool_id,
+                                content=json.dumps(routing_result),
+                                is_error=True,
+                            )
+                        )
+                else:
+                    # The tool doesn't exist or doesn't have a handler
+                    routing_result = {
+                        "result": "Tool unavailable",
+                        "tool_name": routing.tool_call.tool_name,
+                        "content": f"The tool {tool_name} is not available or could not be loaded.",
+                    }
+
+                    # Build the ToolResponse for the error
+                    tool_response.append(
+                        ToolResponse(
+                            tool_id=routing.tool_call.tool_id,
+                            content=json.dumps(routing_result),
+                            is_error=True,
+                        )
                     )
-                )
-            else:
-                # The agent is not allowed access to the requested tool to build the error
+            except Exception as e:
+                # Handle any exceptions that occur during tool execution
+                error_msg = str(e)
                 routing_result = {
-                    "result": "This tool is unavailable",
+                    "result": "Tool execution failed",
                     "tool_name": routing.tool_call.tool_name,
-                    "content": "The tool could not be executed. Please make sure the tool name is correct.",
+                    "content": f"Error executing tool {tool_name}: {error_msg}",
                 }
 
                 # Build the ToolResponse for the error
@@ -532,7 +653,13 @@ class LunaHub:
                 self.console_adapter.display_tool_response(
                     target_agent=routing.source_agent.value,
                     tool_name=routing.tool_call.tool_name,
-                    tool_output=routing_result,
+                    tool_output=(
+                        routing_result
+                        if routing_result is not None
+                        else error_result
+                        if error_result is not None
+                        else "No output provided"
+                    ),
                 )
 
         # Format the tool result for the source agent
@@ -574,12 +701,13 @@ class LunaHub:
 
         # Create the context message
         context_message = (
-            f"<UserMessage>\n{user_message}\n</UserMessage>\n<UserID>\n{user_id}\n</UserID>"
+            f"<UserMessage>\n{user_message}\n</UserMessage>\n<UserID>\n{user_id}\n</UserID>\n"
         )
+        context_message += f"<CurrentDateTime>\n{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n</CurrentDateTime>"
 
         return context_message
 
-    def _prepare_output_content(self, user_message: str, dispatcher_response: Any) -> str:
+    def _prepare_output_content(self, user_message: str, dispatcher_response: AgentResponse) -> str:
         """
         Prepare content for the outputter agent.
 
@@ -595,7 +723,7 @@ class LunaHub:
         {user_message}
 
         ## Luna's Reasoning
-        {dispatcher_response.content}
+        {dispatcher_response.get_text_content()}
 
         Please format this as a natural response from Luna to the user, maintaining her personality.
         """

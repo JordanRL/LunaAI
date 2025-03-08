@@ -1,0 +1,14 @@
+{
+  "type": "episodic",
+  "content": "User shared that they enjoy hiking in the mountains on weekends. They mentioned Tahoe as their favorite hiking location.",
+  "importance": 7,
+  "user_id": "user123",
+  "keywords": ["hiking", "mountains", "weekend activities", "Tahoe"],
+  "emotion": {
+    "pleasure": 0.8,
+    "arousal": 0.6,
+    "dominance": 0.5
+  },
+  "participants": ["user123", "Luna"],
+  "context": "Casual conversation about hobbies and outdoor activities"
+}

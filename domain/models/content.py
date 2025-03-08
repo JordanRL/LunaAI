@@ -122,10 +122,12 @@ class MessageContent:
             # Format for Anthropic's tool_result block
             content_dict = {"type": "tool_result", "tool_use_id": self.tool_result.tool_id}
 
-            if self.tool_result.is_error is not None:
-                content_dict["is_error"] = self.tool_result.is_error
-            else:
-                content_dict["content"] = self.tool_result.content
+            # Always include content (Anthropic API requires the content field)
+            content_dict["content"] = self.tool_result.content
+
+            # Add is_error flag if needed
+            if self.tool_result.is_error:
+                content_dict["is_error"] = True
 
         elif self.type == ContentType.IMAGE and self.image_url is not None:
             # Format for Anthropic's image block

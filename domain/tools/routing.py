@@ -4,8 +4,6 @@ Routing tools for agent-to-agent communication.
 
 from typing import Any, Dict, List, Optional
 
-from debug import DebugLevel, debug_manager, log, log_error
-
 from domain.models.enums import AgentType
 from domain.models.tool import Tool, ToolCategory
 
@@ -53,27 +51,9 @@ Set await_response to true if you need information back from the agent.""",
         message = tool_input.get("message")
         await_response = tool_input.get("await_response", False)
 
-        log(
-            f"Routing request: {target_agent} | Await response: {await_response}",
-            DebugLevel.MINIMAL,
-            debug_manager.symbols.ROUTING,
-        )
-
-        # Show message preview in VERBOSE mode
-        if debug_manager.should_debug(DebugLevel.VERBOSE):
-            message_preview = debug_manager.truncate_content(message, 150)
-            log(f"  Message: {message_preview}", DebugLevel.VERBOSE)
-
         # Validate target agent
         if target_agent not in AgentType.filtered_to_list():
             error_msg = f"Invalid target agent: {target_agent}"
-            log_error(error_msg, "routing_validation")
-
-            # Show available agents in VERBOSE mode
-            if debug_manager.should_debug(DebugLevel.VERBOSE):
-                valid_agents = ", ".join(AgentType.filtered_to_list())
-                log(f"  Valid agents: {valid_agents}", DebugLevel.VERBOSE)
-
             return {
                 "routing_success": False,
                 "error": error_msg,

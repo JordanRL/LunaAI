@@ -5,8 +5,6 @@ Cognition tools for internal thought processes.
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from debug import DebugLevel, debug_manager, log, log_error
-
 from domain.models.tool import Tool, ToolCategory
 
 
@@ -123,19 +121,8 @@ Reflection types:
         reflection_type = tool_input.get("reflection_type", "behavioral")
         context = tool_input.get("context", "")
 
-        log(
-            f"Performing {reflection_type} reflection on: {reflection_topic[:50]}...",
-            DebugLevel.STANDARD,
-            debug_manager.symbols.THINKING,
-        )
-
-        # Show additional context in VERBOSE mode
-        if debug_manager.should_debug(DebugLevel.VERBOSE) and context:
-            log(f"  Context: {context[:150]}", DebugLevel.VERBOSE)
-
         # This would call the actual reflection logic
         # For now, return a simulated reflection
-        log("Simulating self-reflection process", DebugLevel.VERBOSE)
         reflection_outputs = {
             "behavioral": "Luna reflected on her behavior and identified patterns in how she responds.",
             "emotional": "Luna examined her emotional reactions and gained insight into her feelings.",

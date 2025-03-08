@@ -386,8 +386,8 @@ class MemoryService:
         return {
             "query": {"bool": bool_query},
             "sort": [
-                {"importance": {"order": "desc"}},
                 {"timestamp": {"order": "desc"}},
+                {"importance": {"order": "desc"}},
             ],
         }
 

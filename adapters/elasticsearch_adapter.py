@@ -85,7 +85,7 @@ class ElasticsearchAdapter:
             # Create an instance of the schema
             memory_schema = LunaMemoriesIndexSchema()
             self.es.indices.create(
-                index=self.memory_index_name,
+                index=memory_schema.index_name,
                 body={
                     "mappings": memory_schema.mappings,
                     "settings": memory_schema.settings,
@@ -107,7 +107,7 @@ class ElasticsearchAdapter:
             # Create an instance of the schema
             profile_schema = UserProfileIndexSchema()
             self.es.indices.create(
-                index=self.user_profile_index_name,
+                index=profile_schema.index_name,
                 body={
                     "mappings": profile_schema.mappings,
                     "settings": profile_schema.settings,
@@ -129,7 +129,7 @@ class ElasticsearchAdapter:
             # Create an instance of the schema
             relationship_schema = UserRelationshipIndexSchema()
             self.es.indices.create(
-                index=self.user_relationship_index_name,
+                index=relationship_schema.index_name,
                 body={
                     "mappings": relationship_schema.mappings,
                     "settings": relationship_schema.settings,
