@@ -5,14 +5,19 @@ This service manages the three-stage prompt processing system:
 1. Raw: The file as it is read from the file system with no tokens replaced
 2. Pre-processed: The file with relatively stable tokens replaced
 3. Compiled: The file as it is sent to the agent with all tokens replaced
+
+This service uses the PromptTemplate class from core/prompt.py for XML template handling
+and PersonaService for persona information.
 """
 
 import json
 import os
-import re
+from copy import deepcopy
 from typing import Any, Dict, Optional
 
+from core.prompt import PromptTemplate
 from domain.models.agent import AgentConfig
+from services.persona_service import PersonaService
 
 
 class PromptService:
@@ -20,175 +25,365 @@ class PromptService:
     Service for managing system prompt token replacement.
 
     This service handles the loading, caching, and token replacement for system prompts
-    in the three-stage process described in TODO_FEATURES.md.
+    using the PromptTemplate class for XML manipulation and PersonaService for persona data.
     """
 
-    def __init__(self):
-        """Initialize the prompt service."""
-        self.raw_prompts: Dict[str, str] = {}
-        self.preprocessed_prompts: Dict[str, str] = {}
-        self.persona_files: Dict[str, str] = {}
-        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.prompt_generator = None  # Lazy-loaded to avoid circular imports
-
-        # Load persona files
-        self._load_persona_files()
-
-    def _load_persona_files(self) -> None:
-        """Load all persona config files from the persona_configs directory."""
-        persona_dir = os.path.join(self.project_root, "persona_configs")
-
-        for filename in os.listdir(persona_dir):
-            if filename.endswith(".md"):
-                file_path = os.path.join(persona_dir, filename)
-                name = os.path.splitext(filename)[0].upper()
-
-                with open(file_path, "r") as file:
-                    self.persona_files[f"PERSONA_{name}"] = file.read()
-
-    def load_raw_prompt(self, agent_name: str) -> str:
+    def __init__(self, persona_service: Optional[PersonaService] = None):
         """
-        Load the raw system prompt for an agent.
+        Initialize the prompt service.
+
+        Args:
+            persona_service: Optional PersonaService instance for persona data
+        """
+        self.prompt_templates: Dict[str, PromptTemplate] = {}
+        self.preprocessed_templates: Dict[str, PromptTemplate] = {}
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # Inject or create persona service
+        self.persona_service = persona_service or PersonaService()
+
+    def load_prompt_template(self, agent_name: str) -> PromptTemplate:
+        """
+        Load the system prompt template for an agent.
 
         Args:
             agent_name: Name of the agent
 
         Returns:
-            Raw system prompt text
+            PromptTemplate instance for the agent
         """
-        # Check if we already have this prompt cached
-        if agent_name in self.raw_prompts:
-            return self.raw_prompts[agent_name]
+        # Check if we already have this template cached
+        if agent_name in self.prompt_templates:
+            return self.prompt_templates[agent_name]
 
-        # Determine file path - first try XML, then fall back to MD
+        # Determine file path
         system_prompts_dir = os.path.join(self.project_root, "system_prompts", agent_name)
-        xml_path = os.path.join(system_prompts_dir, "system.xml")
+        json_path = os.path.join(system_prompts_dir, "system.json")
 
-        if os.path.exists(xml_path):
-            with open(xml_path, "r") as file:
-                prompt = file.read()
-        else:
+        if not os.path.exists(json_path):
             raise FileNotFoundError(f"No system prompt found for agent {agent_name}")
 
-        # Cache the raw prompt
-        self.raw_prompts[agent_name] = prompt
-        return prompt
+        # Create and cache the template
+        template = PromptTemplate.from_config(json_path)
+        self.prompt_templates[agent_name] = template
+        return template
 
-    def preprocess_prompt(
-        self, agent_config: AgentConfig, token_replacements: Dict[str, Any]
-    ) -> str:
+    def preprocess_prompt(self, agent_config: AgentConfig, replacements: Dict[str, Any]) -> str:
         """
-        Preprocess a system prompt by replacing relatively stable tokens.
+        Preprocess a system prompt by replacing relatively stable content.
+
+        This method uses a dictionary-based approach for applying replacements to the template,
+        organizing the data to match the XML structure.
 
         Args:
             agent_config: Agent configuration
-            token_replacements: Tokens to replace
+            replacements: Dictionary of replacements (can be path-based or direct structure)
 
         Returns:
-            Preprocessed system prompt
+            Preprocessed system prompt as string
         """
-        # Load the raw prompt if not already cached
-        if agent_config.name.value not in self.raw_prompts:
-            self.load_raw_prompt(agent_config.name.value)
+        agent_name = agent_config.name.value
 
-        raw_prompt = self.raw_prompts[agent_config.name.value]
-        preprocessed = raw_prompt
+        # Load the template if not already cached
+        if agent_name not in self.prompt_templates:
+            self.load_prompt_template(agent_name)
 
-        # Replace persona information based on agent_config settings
-        for persona_file, include in agent_config.persona_config.items():
-            if include:
-                persona_token = f"PERSONA_{persona_file.upper()}"
-                preprocessed = self._replace_token(
-                    preprocessed, persona_token, self.persona_files[persona_token]
-                )
+        # Create a copy of the template for preprocessing
+        template = self.prompt_templates[agent_name]
+        preprocessed_template = deepcopy(template)
 
-        # Replace user profile information if available
-        for token, replacement in token_replacements.items():
-            if isinstance(replacement, dict) or isinstance(replacement, list):
-                replacement = json.dumps(replacement)
-            elif not isinstance(replacement, str):
-                replacement = str(replacement)
-            preprocessed = self._replace_token(preprocessed, token, replacement)
+        # Initialize empty structured replacements dict
+        structured_replacements = {}
 
-        # Cache the preprocessed prompt
-        self.preprocessed_prompts[agent_config.name.value] = preprocessed
-        return preprocessed
+        # Add persona information based on agent_config settings
+        persona_name = replacements.get("PERSONA_NAME", "luna")
+        features = agent_config.features
+        if "persona_config" in features:
+            persona_config = features["persona_config"]
+            for persona_section, include in persona_config.items():
+                if include:
+                    if isinstance(include, str) and include == "none":
+                        continue
+                    elif isinstance(include, str):
+                        detail = include.lower()
+                    else:
+                        detail = "all"
+                    # Convert section name to expected format (identity -> identity)
+                    section_name = persona_section.lower()
+
+                    # Map section name to appropriate XML path
+                    xml_section_map = {
+                        "identity": "your_persona_identity",
+                        "personality": "your_personality",
+                        "backstory": "your_backstory_and_personal_history",
+                        "values": "your_values",
+                        "beliefs": "your_beliefs",
+                        "relationships": "your_relationships",
+                    }
+
+                    xml_key = xml_section_map.get(section_name)
+                    if xml_key:
+                        # Get content from PersonaService
+                        section_dict = self.persona_service.get_section_dict(
+                            persona_name, section_name, detail
+                        )
+                        if section_dict:
+                            # Make sure your_identity exists in structured_replacements
+                            if "your_identity" not in structured_replacements:
+                                structured_replacements["your_identity"] = {}
+                            # Add to structured replacements
+                            structured_replacements["your_identity"][xml_key] = section_dict
+
+        # Process content from original replacements - first handle any that might be structured
+        replacements_copy = dict(replacements)
+
+        # Process structured dicts that might be in the replacements
+        for key, value in replacements.items():
+            if isinstance(value, dict) and key != "PERSONA_NAME":
+                # This is a structured dictionary - add it to structured_replacements
+                snake_key = key.lower().replace("-", "_")
+                structured_replacements[snake_key] = value
+                # Remove from the replacements_copy to avoid duplicate processing
+                del replacements_copy[key]
+
+        # Add other content sections based on features
+        knowledge_map = {
+            "emotion_block": "emotional_state",
+            "intuition": "intuition",
+            "working_memory": "working_memory",
+            "recent_memory": "recent_memory",
+            "user_profile": "user_profile",
+            "user_relationship": "user_relationship",
+        }
+
+        # Process feature-based content
+        for feature, enabled in features.items():
+            if feature in knowledge_map and enabled:
+                # Get the corresponding XML section name
+                section_name = knowledge_map[feature]
+
+                # Check if we have content for this section in replacements
+                if section_name.upper() in replacements_copy:
+                    # Make sure your_knowledge exists in structured_replacements
+                    if "your_knowledge" not in structured_replacements:
+                        structured_replacements["your_knowledge"] = {}
+                    structured_replacements["your_knowledge"][section_name] = replacements_copy[
+                        section_name.upper()
+                    ]
+                    # Remove from the replacements_copy to avoid duplicate processing
+                    del replacements_copy[section_name.upper()]
+
+        # Process custom path-style replacements provided in the input
+        for key, value in list(replacements_copy.items()):
+            # Skip special keys
+            if key == "PERSONA_NAME":
+                del replacements_copy[key]
+                continue
+
+            # Handle path-style keys (containing slashes)
+            if "/" in key:
+                parts = key.lower().split("/")
+                # Convert parts to snake_case for apply_dict
+                parts = [part.replace("-", "_") for part in parts]
+
+                # Build nested structure
+                current = structured_replacements
+                for i, part in enumerate(parts):
+                    if i == len(parts) - 1:
+                        # Final part - set the value
+                        current[part] = value
+                    else:
+                        # Intermediate part - create dict if needed
+                        if part not in current:
+                            current[part] = {}
+                        current = current[part]
+                # Remove from the replacements_copy to avoid duplicate processing
+                del replacements_copy[key]
+
+        # Always apply structured replacements if we have any
+        if structured_replacements:
+            preprocessed_template.apply_dict(structured_replacements)
+
+        # For backwards compatibility, also apply any non-special keys from original replacements
+        # that weren't already handled through structured replacements
+        if replacements_copy:
+            preprocessed_template.apply_dict(replacements_copy)
+
+        # Process feature flags to remove nodes
+        self._process_feature_flags(preprocessed_template, agent_config.features)
+
+        # Cache the preprocessed template
+        self.preprocessed_templates[agent_name] = preprocessed_template
+
+        return preprocessed_template.to_string()
 
     def compile_prompt(
         self,
         agent_name: str,
-        token_replacements: Optional[Dict[str, str]] = None,
+        replacements: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Compile a system prompt by replacing all dynamic tokens.
+        Compile a system prompt by replacing all dynamic content.
+
+        This method uses a dictionary-based approach for applying replacements to the template,
+        organizing the data to match the XML structure.
 
         Args:
             agent_name: Name of the agent
-            token_replacements: Optional dictionary of token replacements to apply to the system prompt before sending it to the model.
+            replacements: Optional dictionary of replacements (can use structure-based keys)
 
         Returns:
             Fully compiled system prompt
         """
-        # Get the preprocessed prompt
-        if agent_name not in self.preprocessed_prompts:
+        # Get the preprocessed template
+        if agent_name not in self.preprocessed_templates:
             raise ValueError(f"Agent {agent_name} hasn't been preprocessed yet")
 
-        preprocessed = self.preprocessed_prompts[agent_name]
-        compiled = preprocessed
+        # Create a copy of the preprocessed template for final compilation
+        preprocessed_template = self.preprocessed_templates[agent_name]
+        compiled_template = deepcopy(preprocessed_template)
+        # Copy XML content from preprocessed template to compiled template
+        compiled_template.root = preprocessed_template.root
 
-        # Replace all tokens that were passed in
-        for token, replacement in token_replacements.items():
-            compiled = self._replace_token(compiled, token, replacement)
+        # Apply dynamic replacements
+        if replacements:
+            # Initialize empty structured replacements dict
+            structured_replacements = {}
 
+            # Map common token names to proper XML paths
+            token_map = {
+                "WORKING_MEMORY": "your_knowledge/working_memory",
+                "RECENT_MEMORY": "your_knowledge/recent_memory",
+                "INTUITION": "your_knowledge/intuition",
+                "USER_PROFILE": "your_knowledge/user_profile",
+                "USER_RELATIONSHIP": "your_knowledge/user_relationship",
+                "PAD_PLEASURE": "your_knowledge/emotional_state/pleasure",
+                "PAD_AROUSAL": "your_knowledge/emotional_state/arousal",
+                "PAD_DOMINANCE": "your_knowledge/emotional_state/dominance",
+                "PAD_DESCRIPTOR": "your_knowledge/emotional_state/descriptor",
+            }
+
+            # Process token mappings to structured paths
+            for token, path in token_map.items():
+                if token in replacements:
+                    parts = path.lower().split("/")
+
+                    # Build nested structure
+                    current = structured_replacements
+                    for i, part in enumerate(parts):
+                        if i == len(parts) - 1:
+                            # Final part - set the value
+                            current[part] = replacements[token]
+                        else:
+                            # Intermediate part - create dict if needed
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+
+            # Process other replacements
+            for key, value in replacements.items():
+                # Skip tokens we've already processed
+                if key in token_map:
+                    continue
+
+                # Handle path-style keys (containing slashes)
+                if "/" in key:
+                    parts = key.lower().split("/")
+                    # Convert parts to snake_case for apply_dict
+                    parts = [part.replace("-", "_") for part in parts]
+
+                    # Build nested structure
+                    current = structured_replacements
+                    for i, part in enumerate(parts):
+                        if i == len(parts) - 1:
+                            # Final part - set the value
+                            current[part] = value
+                        else:
+                            # Intermediate part - create dict if needed
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+
+            # If no path-style replacements were used, use the original replacements dict
+            # (excluding tokens we've already processed)
+            if not any("/" in key for key in replacements.keys() if key not in token_map):
+                filtered_replacements = {
+                    k: v for k, v in replacements.items() if k not in token_map
+                }
+                # Only use direct replacements if we haven't built any structured_replacements
+                if not structured_replacements and filtered_replacements:
+                    compiled_template.apply_dict(filtered_replacements)
+                else:
+                    compiled_template.apply_dict(structured_replacements)
+            else:
+                # Apply structured replacements using apply_dict
+                compiled_template.apply_dict(structured_replacements)
+
+        return compiled_template.to_string()
+
+    # Note: We've removed _apply_path_replacements since we now use apply_dict
+
+    def _process_feature_flags(self, template: PromptTemplate, features: Dict[str, Any]) -> None:
         """
-        We want to replace all the tokens that are left in the prompt with an empty string, but we
-        also want to remove the XML tags that the leftover tokens are enclosed in.
-        """
-        if compiled.find("{PAD_PLEASURE}") != -1:
-            pattern = r"<EmotionalState>[\s\S]*?</EmotionalState>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{INTUITION}") != -1:
-            pattern = r"<Intuition>[\s\S]*?</Intuition>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{WORKING_MEMORY}") != -1:
-            pattern = r"<WorkingMemory>[\s\S]*?</WorkingMemory>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{PERSONA_IDENTITY}") != -1:
-            pattern = r"<YourPersonaIdentity>[\s\S]*?</YourPersonaIdentity>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{PERSONA_PERSONALITY}") != -1:
-            pattern = r"<YourPersonality>[\s\S]*?</YourPersonality>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{PERSONA_BACKSTORY}") != -1:
-            pattern = r"<YourBackstoryAndPersonalHistory>[\s\S]*?</YourBackstoryAndPersonalHistory>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{RECENT_MEMORY}") != -1:
-            pattern = r"<RecentMemory>[\s\S]*?</RecentMemory>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{USER_PROFILE}") != -1:
-            pattern = r"<UserProfile>[\s\S]*?</UserProfile>"
-            compiled = re.sub(pattern, "", compiled)
-        if compiled.find("{USER_RELATIONSHIP}") != -1:
-            pattern = r"<UserRelationship>[\s\S]*?</UserRelationship>"
-            compiled = re.sub(pattern, "", compiled)
-
-        return compiled
-
-    def _replace_token(self, text: str, token: str, replacement: str) -> str:
-        """
-        Replace a token in the text with its replacement.
+        Process feature flags and remove nodes based on disabled features.
 
         Args:
-            text: Text to process
-            token: Token to replace (without braces)
-            replacement: Replacement text
-
-        Returns:
-            Text with token replaced
+            template: The PromptTemplate to process
+            features: Dictionary of feature flags from agent config
         """
-        # Match token with surrounding braces
-        pattern = r"\{" + token + r"\}"
-        return re.sub(pattern, replacement, text)
+        # Map of feature flags to corresponding XML nodes
+        feature_node_map = {
+            # Persona config sections
+            "persona_config.identity": "YourIdentity/YourPersonaIdentity",
+            "persona_config.personality": "YourIdentity/YourPersonality",
+            "persona_config.backstory": "YourIdentity/YourBackstoryAndPersonalHistory",
+            "persona_config.values": "YourIdentity/YourValues",
+            "persona_config.beliefs": "YourIdentity/YourBeliefs",
+            "persona_config.relationships": "YourIdentity/YourRelationships",
+            # Other content sections
+            "emotion_block": "YourKnowledge/EmotionalState",
+            "intuition": "YourKnowledge/Intuition",
+            "recent_memory": "YourKnowledge/RecentMemory",
+            "working_memory": "YourKnowledge/WorkingMemory",
+            "user_relationship": "YourKnowledge/UserRelationship",
+            "user_profile": "YourKnowledge/UserProfile",
+        }
+
+        # Process persona_config features
+        if "persona_config" in features and isinstance(features["persona_config"], dict):
+            for section, enabled in features["persona_config"].items():
+                feature_key = f"persona_config.{section}"
+                if feature_key in feature_node_map and not enabled:
+                    template.remove_node(feature_node_map[feature_key])
+
+        # Process other features
+        for feature, enabled in features.items():
+            if feature == "persona_config":
+                continue  # Already handled separately
+
+            if feature in feature_node_map and not enabled:
+                template.remove_node(feature_node_map[feature])
+
+        # Handle cognitive structure features
+        if "cognitive" in features and not features["cognitive"]:
+            # Remove entire cognitive structure if cognitive flag is false
+            template.remove_node("YourCognitiveStructure")
+        elif "cognitive_structure" in features and isinstance(
+            features["cognitive_structure"], dict
+        ):
+            # Handle individual cognitive structure sections
+            cognitive_sections = {
+                "capabilities": "YourCognitiveStructure/Capabilities",
+                "agents": "YourCognitiveStructure/Agents",
+                "interaction_types": "YourCognitiveStructure/InteractionTypes",
+            }
+
+            for section, path in cognitive_sections.items():
+                if (
+                    section in features["cognitive_structure"]
+                    and not features["cognitive_structure"][section]
+                ):
+                    template.remove_node(path)
 
     def invalidate_preprocessed(self, agent_name: Optional[str] = None) -> None:
         """
@@ -198,13 +393,20 @@ class PromptService:
             agent_name: Name of the agent to invalidate, or None for all agents
         """
         if agent_name:
-            if agent_name in self.preprocessed_prompts:
-                del self.preprocessed_prompts[agent_name]
+            if agent_name in self.preprocessed_templates:
+                del self.preprocessed_templates[agent_name]
         else:
-            self.preprocessed_prompts.clear()
+            self.preprocessed_templates.clear()
 
-    def reload_persona_files(self) -> None:
-        """Reload all persona files from disk and invalidate all preprocessed prompts."""
-        self.persona_files.clear()
-        self._load_persona_files()
-        self.invalidate_preprocessed()
+    def load_raw_prompt(self, agent_name: str) -> str:
+        """
+        Legacy method to maintain backward compatibility.
+
+        Args:
+            agent_name: Name of the agent
+
+        Returns:
+            Raw system prompt text
+        """
+        template = self.load_prompt_template(agent_name)
+        return template.to_string()

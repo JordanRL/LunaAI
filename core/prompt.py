@@ -217,24 +217,8 @@ class PromptTemplate:
 
         # Apply node updates from the config
         if "nodes" in config:
-            cls._apply_node_config(template, "", config["nodes"])
-
-        # Process placeholders
-        if "placeholders" in config:
-            processed_placeholders = {}
-            for key, value in config["placeholders"].items():
-                # If value is a file path, read the file content
-                if isinstance(value, str) and value.endswith((".md", ".txt")):
-                    file_path = os.path.join(config_dir, "..", "persona_configs", value)
-                    if os.path.exists(file_path):
-                        with open(file_path, "r") as f:
-                            processed_placeholders[key] = f.read()
-                    else:
-                        processed_placeholders[key] = value
-                else:
-                    processed_placeholders[key] = value
-
-            template.replace_placeholders(processed_placeholders)
+            node_config = config["nodes"]
+            cls._apply_node_config(template, "", node_config)
 
         return template
 
@@ -249,8 +233,29 @@ class PromptTemplate:
             path: Current path in the XML tree
             node_config: Node configuration dictionary
         """
+
+        def _convert_to_title_case(tag: str) -> str:
+            """Convert snake_case or kebab-case to TitleCase."""
+            # Handle kebab-case
+            if "-" in tag:
+                parts = tag.split("-")
+            # Handle snake_case
+            elif "_" in tag:
+                parts = tag.split("_")
+            else:
+                # Already camelCase or TitleCase - convert to parts for consistency
+                import re
+
+                parts = re.findall(r"[A-Z](?:[a-z]+)|[a-z]+", tag)
+
+            # Title case each part and join
+            return "".join(part.title() for part in parts)
+
         for key, value in node_config.items():
-            current_path = f"{path}/{key}" if path else key
+            # Convert key to title case for XML path
+            title_case_key = _convert_to_title_case(key)
+
+            current_path = f"{path}/{title_case_key}" if path else title_case_key
 
             if key == "_text" and isinstance(value, str):
                 # Special key for node text
@@ -258,9 +263,32 @@ class PromptTemplate:
             elif isinstance(value, dict):
                 # Nested structure - recursively process
                 PromptTemplate._apply_node_config(template, current_path, value)
+            elif isinstance(value, (list, tuple)):
+                # Handle lists/arrays
+                node = template.get_node(current_path)
+                if node is None:
+                    # Create the node if it doesn't exist
+                    node = template.add_node(path, title_case_key)
+                else:
+                    # Clear existing children
+                    for child in list(node):
+                        node.remove(child)
+
+                # Add a child node for each list item
+                for i, item in enumerate(value):
+                    item_tag = f"Item{i+1}"
+                    if isinstance(item, dict):
+                        item_node = template.add_node(current_path, item_tag)
+                        item_path = f"{current_path}/{item_tag}"
+                        PromptTemplate._apply_node_config(template, item_path, item)
+                    else:
+                        template.add_node(current_path, item_tag, text=str(item))
             elif isinstance(value, str):
                 # Text content for the node
                 template.update_text(current_path, value)
+            elif value is not None:
+                # Handle other types (numbers, booleans, etc.)
+                template.update_text(current_path, str(value))
 
     def load_placeholder_file(self, placeholder_name: str, file_path: str) -> None:
         """Load a placeholder value from a file.
@@ -330,6 +358,26 @@ class PromptTemplate:
             # Title case each part and join
             return "".join(part.title() for part in parts)
 
+        # Feature flag paths that should not be recreated if they were removed
+        feature_disabled_paths = [
+            "YourIdentity/YourPersonaIdentity",
+            "YourIdentity/YourPersonality",
+            "YourIdentity/YourBackstoryAndPersonalHistory",
+            "YourIdentity/YourValues",
+            "YourIdentity/YourBeliefs",
+            "YourIdentity/YourRelationships",
+            "YourKnowledge/EmotionalState",
+            "YourKnowledge/Intuition",
+            "YourKnowledge/WorkingMemory",
+            "YourKnowledge/RecentMemory",
+            "YourKnowledge/UserProfile",
+            "YourKnowledge/UserRelationship",
+            "YourCognitiveStructure",
+            "YourCognitiveStructure/Capabilities",
+            "YourCognitiveStructure/Agents",
+            "YourCognitiveStructure/InteractionTypes",
+        ]
+
         def _apply_recursive(current_data: Dict[str, Any], current_path: str) -> None:
             """Recursively apply dict data to the template."""
             parent_node = self.get_node(current_path)
@@ -344,12 +392,16 @@ class PromptTemplate:
                 # Create path for this node
                 node_path = f"{current_path}/{title_case_tag}" if current_path else title_case_tag
 
+                # Skip this node if it was intentionally removed due to feature flags
+                if node_path in feature_disabled_paths and self.get_node(node_path) is None:
+                    continue
+
                 # Check if node exists
                 node = self.get_node(node_path)
 
                 if isinstance(value, dict):
-                    # If node doesn't exist, create it
-                    if node is None:
+                    # If node doesn't exist, create it (unless it was intentionally removed)
+                    if node is None and node_path not in feature_disabled_paths:
                         self.add_node(current_path, title_case_tag)
 
                     # Recursively process the nested dict
@@ -357,7 +409,10 @@ class PromptTemplate:
                 elif isinstance(value, (list, tuple)):
                     # If the value is a list, create child nodes for each item
                     if node is None:
-                        node = self.add_node(current_path, title_case_tag)
+                        if node_path not in feature_disabled_paths:
+                            node = self.add_node(current_path, title_case_tag)
+                        else:
+                            continue  # Skip this node and its children
                     else:
                         # Clear existing children
                         for child in list(node):
@@ -375,7 +430,8 @@ class PromptTemplate:
                 else:
                     # For leaf nodes with simple values
                     if node is None:
-                        self.add_node(current_path, title_case_tag, text=str(value))
+                        if node_path not in feature_disabled_paths:
+                            self.add_node(current_path, title_case_tag, text=str(value))
                     else:
                         self.update_text(node_path, str(value))
 

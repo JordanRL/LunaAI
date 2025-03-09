@@ -19,6 +19,7 @@ class AppConfig:
     elasticsearch_url: str = "http://localhost:9200"
     show_agent_thinking: bool = True
     logs_path: str = "logs"
+    persona: str = "luna"
 
 
 @dataclass

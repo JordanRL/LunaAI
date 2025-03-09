@@ -5,6 +5,7 @@ from core.hub import LunaHub
 from services.conversation_service import ConversationService
 from services.emotion_service import EmotionService
 from services.memory_service import MemoryService
+from services.persona_service import PersonaService
 from services.user_service import UserService
 
 
@@ -14,12 +15,13 @@ def main():
     user_service = UserService(es_adapter)
     conversation_service = ConversationService(user_service)
     emotion_service = EmotionService()
+    persona_service = PersonaService()
     logging_adapter = LoggingAdapter
 
     # Import here to avoid circular imports
     from services.prompt_service import PromptService
 
-    prompt_service = PromptService()
+    prompt_service = PromptService(persona_service=persona_service)
 
     try:
         # Try to initialize the MemoryService
@@ -36,6 +38,7 @@ def main():
         prompt_service=prompt_service,
         user_service=user_service,
         memory_service=memory_service,
+        persona_service=persona_service,
     )
 
     user_id = "Jordan"

@@ -1,16 +1,32 @@
 {
+  "name": "persona_evolution",
+  "description": "Meta-agent that analyzes Luna's experiences and interactions to identify meaningful character development opportunities, making subtle, coherent adjustments to her identity, personality traits, and personal history – enabling natural growth and ensuring her character evolves authentically over time",
   "model": "claude-3-7-sonnet-latest",
-  "system_prompt_file": "system.md",
   "max_tokens": 2000,
   "temperature": 0.7,
-  "name": "persona_evolution",
   "tools": [
     "continue_thinking"
   ],
-  "description": "Meta-agent that analyzes Luna's experiences and interactions to identify meaningful character development opportunities, making subtle, coherent adjustments to her identity, personality traits, and personal history – enabling natural growth and ensuring her character evolves authentically over time",
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": true
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": true,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": false,
+    "intuition": false,
+    "recent_memory": false,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": false,
+    "cognitive_structure": {
+      "capabilities": false,
+      "agents": false,
+      "interaction_types": false
+    }
   }
 }

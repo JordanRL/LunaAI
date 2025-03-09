@@ -1,22 +1,35 @@
 {
   "name": "memory_retriever",
   "description": "Access point to Luna's long-term memory that evaluates what information would be relevant or important to recall in the current context, formulates precise memory retrieval queries, and contextualizes memories within Luna's current understanding – representing her ability to access past experiences and knowledge",
-  "model": "claude-3-5-haiku-latest",
+  "model": "claude-3-7-sonnet-latest",
+  "max_tokens": 2000,
+  "temperature": 0.5,
   "tools": [
     "read_memory",
     "read_episodic_memory",
     "read_emotional_memory",
     "read_semantic_memory"
   ],
-  "system_prompt_file": "system.xml",
-  "max_tokens": 2000,
-  "temperature": 0.5,
-  "persona_config": {
-    "identity": true,
-    "personality": false,
-    "backstory": false
-  },
-  "emotion_block": false,
-  "recent_memory": true,
-  "user_relationship": false
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": false,
+      "backstory": false,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": false,
+    "intuition": false,
+    "recent_memory": true,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": false,
+    "cognitive_structure": {
+      "capabilities": false,
+      "agents": false,
+      "interaction_types": false
+    }
+  }
 }

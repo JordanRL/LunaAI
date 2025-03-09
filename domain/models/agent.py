@@ -78,6 +78,7 @@ class AgentConfig:
         tools: List of tools available to this agent
         max_tokens: Maximum tokens for this agent
         temperature: Temperature setting
+        features: Feature flags controlling what content is included in prompts
     """
 
     name: AgentType
@@ -87,7 +88,20 @@ class AgentConfig:
     tools: List[Tool] = field(default_factory=list)
     allowed_tools: List[str] = field(default_factory=list)
     description: Optional[str] = None
-    persona_config: Optional[Dict[str, bool]] = None
-    emotion_block: bool = False
+    features: Dict[str, Any] = field(default_factory=dict)
     max_tokens: int = 4000
     temperature: float = 0.7
+
+    def __post_init__(self):
+        """Validate that required features exist."""
+        if not self.features:
+            raise ValueError("Features dictionary is required in agent config")
+
+        if "persona_config" not in self.features:
+            raise ValueError("persona_config is required in features")
+
+        if "cognitive" not in self.features:
+            raise ValueError("cognitive flag is required in features")
+
+        if self.features["cognitive"] and "cognitive_structure" not in self.features:
+            raise ValueError("cognitive_structure is required when cognitive is true")

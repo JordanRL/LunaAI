@@ -1,22 +1,35 @@
 {
-  "model": "claude-3-5-haiku-latest",
-  "system_prompt_file": "system.md",
+  "name": "relationship_manager",
+  "description": "Manages Luna's social understanding by tracking relationship development with users, interpreting social dynamics, maintaining awareness of how relationships evolve over time, and informing responses based on relationship context – enabling Luna to form authentic connections with distinct relationship stages and history",
+  "model": "claude-3-7-sonnet-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
-  "name": "relationship_manager",
   "tools": [
     "continue_thinking",
     "update_relationship",
     "read_episodic_memory",
     "read_emotional_memory"
   ],
-  "description": "Manages Luna's social understanding by tracking relationship development with users, interpreting social dynamics, maintaining awareness of how relationships evolve over time, and informing responses based on relationship context – enabling Luna to form authentic connections with distinct relationship stages and history",
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": true
-  },
-  "emotion_block": false,
-  "recent_memory": true,
-  "user_relationship": true
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": true,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": false,
+    "intuition": false,
+    "recent_memory": true,
+    "working_memory": false,
+    "user_relationship": true,
+    "user_profile": false,
+    "cognitive": false,
+    "cognitive_structure": {
+      "capabilities": false,
+      "agents": false,
+      "interaction_types": false
+    }
+  }
 }

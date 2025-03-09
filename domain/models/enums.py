@@ -15,6 +15,9 @@ class AgentType(Enum):
     INNER_THOUGHT = "inner_thought"
     PERSONA_EVOLUTION = "persona_evolution"
     SELF_REFLECTION = "self_reflection"
+    SUMMARIZER = "summarizer"
+    SENTIMENT = "sentiment"
+    INSPECT_INTENTION = "inspect_intention"
     OUTPUTTER = "outputter"
 
     @classmethod

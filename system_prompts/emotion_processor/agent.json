@@ -1,19 +1,34 @@
 {
-  "model": "claude-3-5-sonnet-latest",
-  "system_prompt_file": "system.md",
+  "name": "emotion_processor",
+  "description": "Luna's emotional center that evaluates situations through her unique emotional lens, determines appropriate emotional reactions based on personality and context, maintains emotional continuity, and creates authentic emotional responses that influence her overall thinking and communication",
+  "model": "claude-3-7-sonnet-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
-  "name": "emotion_processor",
   "tools": [
     "adjust_emotion",
     "retrieve_memory",
     "continue_thinking"
   ],
-  "description": "Luna's emotional center that evaluates situations through her unique emotional lens, determines appropriate emotional reactions based on personality and context, maintains emotional continuity, and creates authentic emotional responses that influence her overall thinking and communication",
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": true
-  },
-  "emotion_block": true
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": true,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": true,
+    "intuition": false,
+    "recent_memory": false,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": true,
+    "cognitive_structure": {
+      "capabilities": true,
+      "agents": false,
+      "interaction_types": false
+    }
+  }
 }

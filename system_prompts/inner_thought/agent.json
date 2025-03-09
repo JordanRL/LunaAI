@@ -1,18 +1,33 @@
 {
-  "model": "claude-3-5-sonnet-latest",
-  "system_prompt_file": "system.md",
+  "name": "inner_thought",
+  "description": "Produces Luna's rich inner monologue, allowing her to process complex thoughts, explore tangential ideas, work through confusion, examine her own values, or reflect on matters unrelated to the immediate conversation – providing the space for authentic cognitive exploration that humans experience",
+  "model": "claude-3-7-sonnet-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
-  "name": "inner_thought",
   "tools": [
     "process_inner_thought",
     "continue_thinking"
   ],
-  "description": "Produces Luna's rich inner monologue, allowing her to process complex thoughts, explore tangential ideas, work through confusion, examine her own values, or reflect on matters unrelated to the immediate conversation – providing the space for authentic cognitive exploration that humans experience",
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": true
-  },
-  "emotion_block": true
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": true,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": true,
+    "intuition": false,
+    "recent_memory": false,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": true,
+    "cognitive_structure": {
+      "capabilities": true,
+      "agents": true,
+      "interaction_types": true
+    }
+  }
 }

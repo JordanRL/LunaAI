@@ -1,15 +1,30 @@
 {
-  "model": "claude-3-5-haiku-latest",
-  "system_prompt_file": "system.md",
+  "name": "sentiment",
+  "description": "Analytical system that evaluates the emotional tone, intent, and underlying attitude in user messages – providing objective assessment of communication sentiment that helps Luna respond appropriately to subtle emotional cues",
+  "model": "claude-3-7-sonnet-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
-  "name": "sentiment",
-  "tools": [
-  ],
-  "description": "Analytical system that evaluates the emotional tone, intent, and underlying attitude in user messages – providing objective assessment of communication sentiment that helps Luna respond appropriately to subtle emotional cues",
-  "persona_config": {
-    "identity": true,
-    "personality": false,
-    "backstory": false
+  "tools": [],
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": false,
+      "backstory": false,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": false,
+    "intuition": false,
+    "recent_memory": false,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": false,
+    "cognitive_structure": {
+      "capabilities": false,
+      "agents": false,
+      "interaction_types": false
+    }
   }
 }

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -202,7 +202,7 @@ class PersonaRelationships(PersonaSection):
     """
 
     _section: str = "relationships"
-    creator_relationship: Dict[str, str] = field(default_factory=dict)  # Dynamics with creator
+    creator_relationship: Dict[str, Any] = field(default_factory=dict)  # Dynamics with creator
     fictional_friends: List[Dict[str, str]] = field(
         default_factory=list
     )  # Constructed social connections

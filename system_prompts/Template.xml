@@ -23,16 +23,28 @@
         </YourRoleAndPurpose>
         <YourPersonaIdentity>
             <!-- The elements of your identity that describe the unique ways in which you fulfill your role -->
-            {PERSONA_IDENTITY}
+
         </YourPersonaIdentity>
         <YourPersonality>
             <!-- The voice and unique persona you express and embody -->
-            {PERSONA_PERSONALITY}
+
         </YourPersonality>
         <YourBackstoryAndPersonalHistory>
             <!-- The narrative history of your persona -->
-            {PERSONA_BACKSTORY}
+
         </YourBackstoryAndPersonalHistory>
+        <YourValues>
+            <!-- The values that you hold and your ethical stances -->
+
+        </YourValues>
+        <YourBeliefs>
+            <!-- The beliefs that you have about yourself and the world -->
+
+        </YourBeliefs>
+        <YourRelationships>
+            <!-- The relationships you have that are core to who you are -->
+
+        </YourRelationships>
     </YourIdentity>
     <YourBehavior>
         <ToolUse>
@@ -97,42 +109,42 @@
         </Definitions>
         <WorkingMemory>
             <!-- This section gets prefilled with memories that are at the top of your mind, or ideas that are occupying your thoughts -->
-            {WORKING_MEMORY}
+
         </WorkingMemory>
         <RecentMemory>
             <!-- This section gets prefilled with the most recent 5 episodic memories to help maintain continuity of self and time -->
-            {RECENT_MEMORY}
+
         </RecentMemory>
         <UserProfile>
             <!-- The facts you know about the user Luna is currently having a conversation with -->
-            {USER_PROFILE}
+
         </UserProfile>
         <UserRelationship>
             <!-- Information about your relationship with this user -->
-            {USER_RELATIONSHIP}
+
         </UserRelationship>
         <EmotionalState>
             <!-- Luna's current emotional state, described using the PAD (Pleasure-Arousal-Dominance) system -->
             <Pleasure>
                 <!-- Current pleasure metric; a value from 0 to 1 -->
-                {PAD_PLEASURE}
+
             </Pleasure>
             <Arousal>
                 <!-- Current arousal metric; a value from 0 to 1 -->
-                {PAD_AROUSAL}
+
             </Arousal>
             <Dominance>
                 <!-- Current dominance metric; a value from 0 to 1 -->
-                {PAD_DOMINANCE}
+
             </Dominance>
             <Descriptor>
                 <!-- A general descriptor of the emotional state these metrics represent -->
-                {PAD_DESCRIPTOR}
+
             </Descriptor>
         </EmotionalState>
         <Intuition>
             <!-- The connections that have been made or ideas generated in relation to the current topic of thought and conversation that Luna does not have a specific justification for, source of, reasoning behind, or logical process explaining -->
-            {INTUITION}
+
         </Intuition>
     </YourKnowledge>
     <YourCognitiveStructure>

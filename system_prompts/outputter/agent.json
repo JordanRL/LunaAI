@@ -2,14 +2,29 @@
   "name": "outputter",
   "description": "Luna's communication interface that takes her internal thoughts, decisions, and emotional states and crafts them into natural, authentic responses that reflect her personality, current mood, and relationship with the user – translating her complex inner world into engaging, coherent external communication",
   "model": "claude-3-7-sonnet-latest",
-  "tools": [],
-  "system_prompt_file": "system.md",
   "max_tokens": 2000,
   "temperature": 0.8,
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": false
-  },
-  "emotion_block": false
+  "tools": [],
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": false,
+      "values": false,
+      "beliefs": false,
+      "relationships": false
+    },
+    "emotion_block": false,
+    "intuition": false,
+    "recent_memory": false,
+    "working_memory": false,
+    "user_relationship": false,
+    "user_profile": false,
+    "cognitive": false,
+    "cognitive_structure": {
+      "capabilities": false,
+      "agents": false,
+      "interaction_types": false
+    }
+  }
 }

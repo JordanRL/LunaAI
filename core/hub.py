@@ -23,6 +23,8 @@ from domain.models.routing import RoutingInstruction
 from domain.models.tool import ToolRegistry
 from services.conversation_service import ConversationService
 from services.emotion_service import EmotionService
+from services.memory_service import MemoryService
+from services.persona_service import PersonaService
 from services.prompt_service import PromptService
 from services.user_service import UserService
 
@@ -46,7 +48,8 @@ class LunaHub:
         emotion_service: EmotionService,
         prompt_service: PromptService,
         user_service: UserService,
-        memory_service=None,
+        memory_service: MemoryService,
+        persona_service: PersonaService,
     ):
         """
         Initialize the Luna hub system.
@@ -58,6 +61,7 @@ class LunaHub:
             prompt_service: Service for managing system prompts
             user_service: Service for managing user information
             memory_service: Optional service for memory operations
+            persona_service: Optional service for persona operations
         """
         self.execution_stats = {"total_tokens": 0, "total_time": 0, "requests": 0}
 
@@ -70,8 +74,11 @@ class LunaHub:
         self.prompt_service = prompt_service
         self.user_service = user_service
         self.memory_service = memory_service
+        self.persona_service = persona_service
 
         self.app_config = get_app_config()
+
+        self.persona_service.load_persona(self.app_config.persona)
 
         # Load tools and agents
         self._load_tools()
@@ -112,19 +119,41 @@ class LunaHub:
             )
         )
 
-        recent_memories_str = ""
+        recent_memories_list = []
         for memory in recent_memories:
-            recent_memories_str = f"\n<MemoryJSON>\n{json.dumps(memory.to_document())}\n</MemoryJSON>\n{recent_memories_str}"
+            recent_memories_list.append(memory.to_document())
 
         created, user_profile, user_relationship = self.user_service.create_or_get_user(
             user_id="Jordan"
         )
 
-        token_replacements = {
-            "USER_PROFILE": user_profile.model_dump(mode="json"),
-            "USER_RELATIONSHIP": user_relationship.model_dump(mode="json"),
-            "RECENT_MEMORY": recent_memories_str,
+        # Convert model objects to serializable dictionaries
+        user_profile_dict = {}
+        user_relationship_dict = {}
+
+        if user_profile:
+            user_profile_dict = user_profile.model_dump()
+            # Handle any datetime objects that might be in the model
+            for key, value in user_profile_dict.items():
+                if hasattr(value, "isoformat"):  # Check if it's a datetime-like object
+                    user_profile_dict[key] = value.isoformat()
+
+        if user_relationship:
+            user_relationship_dict = user_relationship.model_dump()
+            # Handle any datetime objects that might be in the model
+            for key, value in user_relationship_dict.items():
+                if hasattr(value, "isoformat"):  # Check if it's a datetime-like object
+                    user_relationship_dict[key] = value.isoformat()
+
+        structured_replacements = {
+            "your_knowledge": {
+                "user_profile": user_profile_dict,
+                "user_relationship": user_relationship_dict,
+                "recent_memory": recent_memories_list,
+            }
         }
+
+        # Prepare structured replacements for all agents
 
         # Iterate through directories in system_prompts
         for agent_dir in os.listdir(system_prompts_dir):
@@ -148,14 +177,15 @@ class LunaHub:
             # Create AgentConfig object
             agent_name = agent_config_data.get("name")
 
-            current_token_replacements = token_replacements.copy()
-
-            if not agent_config_data.get("user_relationship"):
-                del current_token_replacements["USER_RELATIONSHIP"]
-            if not agent_config_data.get("recent_memory"):
-                del current_token_replacements["RECENT_MEMORY"]
+            # Verify features section exists
+            if "features" not in agent_config_data:
+                raise ValueError(f"Agent {agent_name} config is missing features section")
 
             try:
+                # Clear the template cache for this agent to force a reload
+                if agent_name in self.prompt_service.prompt_templates:
+                    del self.prompt_service.prompt_templates[agent_name]
+
                 # Load and preprocess the system prompt using PromptService
                 self.prompt_service.load_raw_prompt(agent_name)
             except FileNotFoundError:
@@ -184,12 +214,13 @@ class LunaHub:
                 max_tokens=agent_config_data.get("max_tokens", 4000),
                 temperature=agent_config_data.get("temperature", 0.7),
                 description=agent_config_data.get("description", None),
-                persona_config=agent_config_data.get("persona_config", []),
+                features=agent_config_data["features"],
             )
 
             system_prompt = self.prompt_service.preprocess_prompt(
-                agent_config, current_token_replacements
+                agent_config, structured_replacements
             )
+
             agent_config.system_prompt = system_prompt
 
             # Create Agent instance
