@@ -2,19 +2,20 @@
   "name": "dispatcher",
   "description": "Core cognitive coordinator that analyzes user messages, determines which aspects of Luna's mind need to be engaged, routes to appropriate specialized agents, and synthesizes their responses into cohesive reasoning",
   "model": "claude-3-7-sonnet-latest",
+  "max_tokens": 4000,
+  "temperature": 0.7,
   "tools": [
     "route_to_agent",
     "continue_thinking"
   ],
-  "system_prompt_file": "system.md",
-  "max_tokens": 4000,
-  "temperature": 0.7,
-  "persona_config": {
-    "identity": true,
-    "personality": true,
-    "backstory": true
-  },
-  "emotion_block": true,
-  "recent_memory": true,
-  "user_relationship": true
+  "features": {
+    "persona_config": {
+      "identity": true,
+      "personality": true,
+      "backstory": true
+    },
+    "emotion_block": true,
+    "recent_memory": true,
+    "user_relationship": true
+  }
 }

@@ -58,6 +58,29 @@ class Memory:
 
 
 @dataclass
+class CognitiveMemory(Memory):
+    """
+    Represents a cognitive memory in Luna's memory system.
+    """
+
+    memory_type: str = "cognitive"
+    is_private: bool = True
+    thought_type: Optional[str] = None
+
+    def to_document(self) -> Dict[str, Any]:
+        doc = super().to_document()
+
+        doc.update(
+            {
+                "is_private": self.is_private,
+                "thought_type": self.thought_type,
+            }
+        )
+
+        return doc
+
+
+@dataclass
 class EpisodicMemory(Memory):
     """
     Represents an episodic memory in Luna's memory system.
@@ -194,6 +217,17 @@ class MemoryQuery:
 
 
 @dataclass
+class CognitiveMemoryQuery(MemoryQuery):
+    """
+    Parameters for cognitive memory retrieval queries.
+    """
+
+    memory_type: str = "cognitive"
+    is_private: Optional[bool] = None
+    thought_type: Optional[str] = None
+
+
+@dataclass
 class EpisodicMemoryQuery(MemoryQuery):
     """
     Parameters for episodic memory retrieval queries.
@@ -259,7 +293,14 @@ class MemoryResult:
         message: Optional status message
     """
 
-    memories: List[Memory]
+    memories: List[
+        Memory
+        | CognitiveMemory
+        | EpisodicMemory
+        | EmotionalMemory
+        | SemanticMemory
+        | RelationshipMemory
+    ]
     query: str
     total_found: int
     message: Optional[str] = None
@@ -268,7 +309,14 @@ class MemoryResult:
     def __iter__(
         self,
     ) -> Generator[
-        Memory | EpisodicMemory | EmotionalMemory | SemanticMemory | RelationshipMemory, None, None
+        Memory
+        | CognitiveMemory
+        | EpisodicMemory
+        | EmotionalMemory
+        | SemanticMemory
+        | RelationshipMemory,
+        None,
+        None,
     ]:
         """
         Support for the 'in' operator to iterate over memories.

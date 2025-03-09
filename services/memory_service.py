@@ -44,7 +44,7 @@ class MemoryService:
         self._memory_cache = {}  # Simple in-memory cache: memory_id -> (memory, timestamp)
         self._cache_ttl = 300  # Cache TTL in seconds (5 minutes)
 
-    def store_memory(self, memory: Memory) -> str:
+    def store_memory(self, memory: Memory) -> Optional[str]:
         """
         Store a memory and return its ID.
 

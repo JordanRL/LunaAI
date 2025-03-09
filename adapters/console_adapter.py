@@ -411,7 +411,10 @@ class ConsoleAdapter:
             panel_style = "red"
         else:
             # For success responses, use standard JSON formatting
-            formatted_output = JSON.from_data(tool_output, indent=2)
+            if isinstance(tool_output, dict):
+                formatted_output = JSON.from_data(tool_output, indent=2)
+            elif hasattr(tool_output, "to_dict"):
+                formatted_output = JSON.from_data(tool_output.to_dict(), indent=2)
             panel_title = f"Tool Response: {tool_name}"
             panel_style = self.get_agent_style(target_agent)
 

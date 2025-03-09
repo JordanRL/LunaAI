@@ -89,7 +89,7 @@ Use this tool to make meaningful adjustments when events warrant an emotional re
 
         # Return current emotional state and interpretation
         return {
-            "current_emotional_state": self.emotion_service.get_current_state(),
+            "current_emotional_state": self.emotion_service.get_current_state().to_dict(),
             "relative_to_baseline": self.emotion_service.get_relative_state(),
             "emotion_label": self.emotion_service.get_emotion_label(),
             "changes": {

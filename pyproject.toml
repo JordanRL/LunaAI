@@ -7,7 +7,10 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 python_classes = "Test*"
-addopts = "--verbose"
+addopts = "--verbose --cov-config=pyproject.toml"
+
+[tool.coverage.run]
+omit = ["scripts/*"]
 
 [tool.mypy]
 python_version = "3.9"

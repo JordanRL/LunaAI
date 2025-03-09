@@ -121,6 +121,29 @@ class TestMemoryService(unittest.TestCase):
         # Verify update access time was called
         self.mock_es_adapter.update_document.assert_called()
 
+        # Test error case for search
+        self.mock_es_adapter.search.reset_mock()
+        self.mock_es_adapter.update_document.reset_mock()
+        self.mock_es_adapter.check_document_exists.reset_mock()
+
+        # Set up mock search response for error
+        self.mock_es_adapter.search.side_effect = Exception("Search error")
+
+        # Call method
+        result = self.memory_service.retrieve_memories(query)
+
+        # Verify error handling
+        self.assertIsInstance(result, MemoryResult)
+        self.assertEqual(len(result.memories), 0)
+        self.assertEqual(result.total_found, 0)
+        self.assertIn("Error", result.message)
+
+        # Verify update access time was not called
+        self.mock_es_adapter.update_document.assert_not_called()
+
+        # Reset for next test
+        self.mock_es_adapter.search.side_effect = None
+
     def test_get_memory_by_id(self):
         """Test retrieving a memory by ID."""
         # Set up mock get response
@@ -172,6 +195,39 @@ class TestMemoryService(unittest.TestCase):
         # But update access time should still be called
         self.mock_es_adapter.update_document.assert_called()
 
+        # Test memory not found case
+        self.mock_es_adapter.get_memory.reset_mock()
+        self.mock_es_adapter.update_document.reset_mock()
+
+        # Set up mock get response for memory not found
+        self.mock_es_adapter.get_memory.return_value = {"found": False}
+
+        # Call method
+        memory = self.memory_service.get_memory_by_id("nonexistent")
+
+        # Verify result is None
+        self.assertIsNone(memory)
+
+        # Verify update access time was not called
+        self.mock_es_adapter.update_document.assert_not_called()
+
+        # Test error case
+        self.mock_es_adapter.get_memory.reset_mock()
+
+        # We need to clear the cache first, otherwise it will return the cached memory
+        self.memory_service._memory_cache.clear()
+
+        self.mock_es_adapter.get_memory.side_effect = Exception("Get memory error")
+
+        # Call method
+        memory = self.memory_service.get_memory_by_id("test123")
+
+        # Verify result is None
+        self.assertIsNone(memory)
+
+        # Reset for next test
+        self.mock_es_adapter.get_memory.side_effect = None
+
     def test_update_memory(self):
         """Test updating a memory."""
         # Set update_memory to return True
@@ -216,6 +272,76 @@ class TestMemoryService(unittest.TestCase):
 
         # Cache should be invalidated
         self.assertNotIn("test123", self.memory_service._memory_cache)
+
+        # Test delete failure case
+        self.mock_es_adapter.delete_memory.reset_mock()
+        self.mock_es_adapter.delete_memory.return_value = False
+
+        # Add back to cache
+        self.memory_service._memory_cache["test123"] = (memory, datetime.now())
+
+        # Call method
+        result = self.memory_service.delete_memory("test123")
+
+        # Verify results
+        self.assertFalse(result)
+
+        # Cache should still be invalidated
+        self.assertNotIn("test123", self.memory_service._memory_cache)
+
+        # Test error case
+        self.mock_es_adapter.delete_memory.reset_mock()
+        self.mock_es_adapter.delete_memory.side_effect = Exception("Delete error")
+
+        # Call method
+        result = self.memory_service.delete_memory("test123")
+
+        # Verify results
+        self.assertFalse(result)
+
+        # Reset for next test
+        self.mock_es_adapter.delete_memory.side_effect = None
+
+    def test_update_memory_access_time(self):
+        """Test updating memory access time."""
+        # Setup - document exists
+        self.mock_es_adapter.check_document_exists.return_value = True
+        memory_id = "test123"
+
+        # Call method - since this function returns None, we'll test its effects instead
+        self.memory_service._update_memory_access_time(memory_id)
+
+        # Verify update_document was called
+        self.mock_es_adapter.update_document.assert_called_once()
+        args, kwargs = self.mock_es_adapter.update_document.call_args
+        self.assertEqual(kwargs["index_name"], "test-memories")
+        self.assertEqual(kwargs["doc_id"], memory_id)
+
+        # Test document does not exist
+        self.mock_es_adapter.update_document.reset_mock()
+        self.mock_es_adapter.check_document_exists.return_value = False
+
+        # Call method
+        self.memory_service._update_memory_access_time(memory_id)
+
+        # Verify update_document was not called
+        self.mock_es_adapter.update_document.assert_not_called()
+
+        # Test error case
+        self.mock_es_adapter.check_document_exists.side_effect = Exception("Check error")
+
+        # Call method (should not raise exception)
+        try:
+            self.memory_service._update_memory_access_time(memory_id)
+            exception_raised = False
+        except Exception:
+            exception_raised = True
+
+        # Verify no exception was raised
+        self.assertFalse(exception_raised)
+
+        # Reset for next test
+        self.mock_es_adapter.check_document_exists.side_effect = None
 
     def test_memory_type_conversion(self):
         """Test converting documents to specific memory types."""
@@ -319,6 +445,158 @@ class TestMemoryService(unittest.TestCase):
         es_empty_query = self.memory_service._build_es_query(empty_query)
         self.assertIn("query", es_empty_query)
         self.assertIn("match_all", es_empty_query["query"])
+
+        # Test query with memory_type
+        memory_type_query = MemoryQuery(query="test", memory_type="episodic")
+        es_memory_type_query = self.memory_service._build_es_query(memory_type_query)
+        bool_query = es_memory_type_query["query"]["bool"]
+        self.assertTrue(
+            any(
+                "term" in clause and "memory_type" in clause["term"]
+                for clause in bool_query.get("filter", [])
+            )
+        )
+
+        # Test query with user_id
+        user_id_query = MemoryQuery(query="test", user_id="test_user")
+        es_user_id_query = self.memory_service._build_es_query(user_id_query)
+        bool_query = es_user_id_query["query"]["bool"]
+        self.assertTrue(
+            any(
+                "term" in clause and "user_id" in clause["term"]
+                for clause in bool_query.get("filter", [])
+            )
+        )
+
+        # Test query with importance threshold
+        importance_query = MemoryQuery(query="test", importance_threshold=5)
+        es_importance_query = self.memory_service._build_es_query(importance_query)
+        bool_query = es_importance_query["query"]["bool"]
+        self.assertTrue(
+            any(
+                "range" in clause and "importance" in clause["range"]
+                for clause in bool_query.get("filter", [])
+            )
+        )
+
+        # Test query with keywords
+        keywords_query = MemoryQuery(query="test", keywords=["important", "meeting"])
+        es_keywords_query = self.memory_service._build_es_query(keywords_query)
+        bool_query = es_keywords_query["query"]["bool"]
+        self.assertTrue(
+            any(
+                "match" in clause and "keywords" in clause["match"]
+                for clause in bool_query.get("should", [])
+            )
+        )
+
+        # Test semantic query with complete parameters
+        full_semantic_query = SemanticMemoryQuery(
+            query="python",
+            domain="programming",
+            certainty_threshold=0.7,
+            verifiability_threshold=0.6,
+            source="documentation",
+            source_reliability_threshold=0.8,
+        )
+        es_full_semantic_query = self.memory_service._build_es_query(full_semantic_query)
+        bool_query = es_full_semantic_query["query"]["bool"]
+        filter_clauses = bool_query.get("filter", [])
+
+        # Check each filter clause exists
+        self.assertTrue(any("term" in c and "domain" in c["term"] for c in filter_clauses))
+        self.assertTrue(any("term" in c and "source" in c["term"] for c in filter_clauses))
+        self.assertTrue(any("range" in c and "certainty" in c["range"] for c in filter_clauses))
+        self.assertTrue(any("range" in c and "verifiability" in c["range"] for c in filter_clauses))
+        self.assertTrue(
+            any("range" in c and "source_reliability" in c["range"] for c in filter_clauses)
+        )
+
+    def test_build_emotional_query(self):
+        """Test building Elasticsearch queries from EmotionalMemoryQuery objects."""
+        # Test emotional query with emotional state
+        emotional_state = EmotionalState(pleasure=0.7, arousal=0.6, dominance=0.5)
+        emotional_query = MemoryQuery(query="happy moment", emotional_state=emotional_state)
+
+        es_emotional_query = self.memory_service._build_es_query(emotional_query)
+        bool_query = es_emotional_query["query"]["bool"]
+        filter_clauses = bool_query.get("filter", [])
+
+        # Check that emotional state filters are added
+        self.assertTrue(
+            any("range" in c and "emotion_pleasure" in c["range"] for c in filter_clauses)
+        )
+        self.assertTrue(
+            any("range" in c and "emotion_arousal" in c["range"] for c in filter_clauses)
+        )
+        self.assertTrue(
+            any("range" in c and "emotion_dominance" in c["range"] for c in filter_clauses)
+        )
+
+        # Test EmotionalMemoryQuery with all parameters
+        full_emotional_query = EmotionalMemoryQuery(
+            query="feeling excited",
+            trigger="achievement",
+            event_pleasure_threshold=0.7,
+            event_arousal_threshold=0.8,
+            event_dominance_threshold=0.6,
+        )
+
+        es_full_emotional_query = self.memory_service._build_es_query(full_emotional_query)
+        bool_query = es_full_emotional_query["query"]["bool"]
+        must_clauses = bool_query.get("must", [])
+        filter_clauses = bool_query.get("filter", [])
+
+        # Check trigger filter exists
+        self.assertTrue(any("match" in c and "trigger" in c["match"] for c in must_clauses))
+
+        # Check emotion threshold filters exist
+        self.assertTrue(
+            any("range" in c and "event_pleasure" in c["range"] for c in filter_clauses)
+        )
+        self.assertTrue(any("range" in c and "event_arousal" in c["range"] for c in filter_clauses))
+        self.assertTrue(
+            any("range" in c and "event_dominance" in c["range"] for c in filter_clauses)
+        )
+
+    def test_build_relationship_query(self):
+        """Test building Elasticsearch queries from RelationshipMemoryQuery objects."""
+        # Test relationship query with all parameters
+        relationship_query = RelationshipMemoryQuery(
+            query="friendship",
+            relationship_type="friendship",
+            closeness_threshold=0.7,
+            trust_threshold=0.8,
+            apprehension_threshold=0.2,
+            shared_experiences=["coffee", "projects"],
+            connection_points=["technology", "movies"],
+        )
+
+        es_relationship_query = self.memory_service._build_es_query(relationship_query)
+        bool_query = es_relationship_query["query"]["bool"]
+        filter_clauses = bool_query.get("filter", [])
+        should_clauses = bool_query.get("should", [])
+
+        # Check relationship type filter exists
+        self.assertTrue(
+            any("term" in c and "relationship_type" in c["term"] for c in filter_clauses)
+        )
+
+        # Check threshold filters exist
+        self.assertTrue(any("range" in c and "closeness" in c["range"] for c in filter_clauses))
+        self.assertTrue(any("range" in c and "trust" in c["range"] for c in filter_clauses))
+        self.assertTrue(any("range" in c and "apprehension" in c["range"] for c in filter_clauses))
+
+        # Check shared experiences and connection points matchers exist
+        shared_exp_matches = [
+            c for c in should_clauses if "match" in c and "shared_experiences" in c["match"]
+        ]
+        connection_matches = [
+            c for c in should_clauses if "match" in c and "connection_points" in c["match"]
+        ]
+
+        self.assertEqual(len(shared_exp_matches), 2)  # One for each shared experience
+        self.assertEqual(len(connection_matches), 2)  # One for each connection point
 
 
 if __name__ == "__main__":

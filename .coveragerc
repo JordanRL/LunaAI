@@ -1,0 +1,9 @@
+[run]
+source = .
+omit =
+    scripts/*
+    */__pycache__/*
+    */\.*/*
+    */venv/*
+    */env/*
+    setup.py

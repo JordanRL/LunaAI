@@ -1,6 +1,7 @@
 .idea
 logs
 .claude
+memory_files
 
 # Python cache files
 __pycache__/

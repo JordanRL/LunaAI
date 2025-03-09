@@ -29,6 +29,7 @@ class PromptService:
         self.preprocessed_prompts: Dict[str, str] = {}
         self.persona_files: Dict[str, str] = {}
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.prompt_generator = None  # Lazy-loaded to avoid circular imports
 
         # Load persona files
         self._load_persona_files()
