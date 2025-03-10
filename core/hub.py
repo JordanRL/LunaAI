@@ -18,7 +18,8 @@ from config.settings import get_api_keys, get_app_config
 from core.agent import Agent
 from domain.models.agent import AgentResponse
 from domain.models.content import MessageContent, ToolResponse
-from domain.models.memory import EpisodicMemoryQuery, MemoryQuery
+from domain.models.enums import AgentType, ContentType, WorkingMemoryType
+from domain.models.memory import EpisodicMemoryQuery, MemoryQuery, WorkingMemory
 from domain.models.routing import RoutingInstruction
 from domain.models.tool import ToolRegistry
 from services.conversation_service import ConversationService
@@ -43,6 +44,7 @@ class LunaHub:
 
     def __init__(
         self,
+        user_id: str,
         console_adapter: ConsoleAdapter,
         conversation_service: ConversationService,
         emotion_service: EmotionService,
@@ -64,6 +66,7 @@ class LunaHub:
             persona_service: Optional service for persona operations
         """
         self.execution_stats = {"total_tokens": 0, "total_time": 0, "requests": 0}
+        self.user_id = user_id
 
         # Adapters
         self.console_adapter = console_adapter
@@ -115,7 +118,7 @@ class LunaHub:
         recent_memories = self.memory_service.retrieve_memories(
             EpisodicMemoryQuery(
                 limit=5,
-                user_id="Jordan",
+                user_id=self.user_id,
             )
         )
 
@@ -124,7 +127,7 @@ class LunaHub:
             recent_memories_list.append(memory.to_document())
 
         created, user_profile, user_relationship = self.user_service.create_or_get_user(
-            user_id="Jordan"
+            user_id=self.user_id
         )
 
         # Convert model objects to serializable dictionaries
@@ -305,15 +308,17 @@ class LunaHub:
                         # Register the tool in the registry
                         self.tools.register(tool_instance)
 
-    def _handle_command(self, user_message: str) -> bool:
+    def _handle_command(self, user_message: str) -> int:
         """
         Handles basic commands.
         """
         if user_message == "/exit" or user_message == "/quit":
-            return False
-        return True
+            return 1
+        if user_message == "/logout" or user_message == "/login":
+            return 2
+        return 0
 
-    def process_message(self, user_message: str, user_id: str) -> str:
+    def process_message(self, user_message: str) -> str:
         """
         Process a user message through the agent network.
 
@@ -324,25 +329,25 @@ class LunaHub:
 
         Args:
             user_message: The user's input message
-            user_id: The user's unique ID
 
         Returns:
             String with the final response
         """
-        # Check for heartbeat message
-        if user_message.startswith("[HEARTBEAT]"):
-            return self._process_heartbeat(user_message, user_id)
-
         commands = self._handle_command(user_message)
 
-        if not commands:
-            exit("Time to quit. Goodbye!")
+        if commands == 1:
+            self._shutdown()
+        if commands == 2 or self.user_id is None or self.user_id == "":
+            self._login()
+            user_message = self.user_prompt()
 
         # Get conversation ID
-        conversation_id = self.conversation_service.get_conversation_id_by_user_id(user_id)
+        conversation_id = self.conversation_service.get_conversation_id_by_user_id(self.user_id)
         if not conversation_id:
-            conversation = self.conversation_service.create_conversation(user_id)
+            conversation = self.conversation_service.create_conversation(self.user_id)
             conversation_id = conversation.conversation_id
+
+        self.conversation_service.create_internal_conversation()
 
         # Store user message in conversation
         self.conversation_service.add_user_message(
@@ -350,7 +355,9 @@ class LunaHub:
         )
 
         # Create context message for dispatcher
-        context_message = self._build_context_message(user_message, user_id)
+        context_message = self._build_context_message(user_message, self.user_id)
+
+        self.console_adapter.start_thinking_section()
 
         # Execute dispatcher agent with token replacements
         dispatcher_response = self.execute_agent(
@@ -371,6 +378,7 @@ class LunaHub:
         outputter_response = self.execute_agent(
             agent_name="outputter",
             message=formatted_content,
+            suppress_thinking=True,
         )
 
         final_response = outputter_response.message.content[-1]
@@ -382,13 +390,36 @@ class LunaHub:
         self.emotion_service.decay()
 
         # Update user interaction stats
-        self.user_service.update_interaction_stats(user_id)
+        self.user_service.update_interaction_stats(self.user_id)
+
+        # Prepare thought summary
+        summary_response = self.execute_agent(
+            agent_name=AgentType.SUMMARIZER.value,
+            message=MessageContent.make_text(
+                f"Summarize this series of thinking steps into the thought process and conclusions drawn:\n\n{self.conversation_service.compile_internal()}"
+            ),
+        )
+
+        # Add thought summary to working memory
+        self.memory_service.add_working_memory(
+            WorkingMemory(
+                type=WorkingMemoryType.THOUGHT,
+                content="Previous Thoughts ("
+                + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                + "):\n"
+                + summary_response.message.get_text(),
+                importance=3,
+            )
+        )
+
+        self.console_adapter.end_thinking_section()
 
         return outputter_response.message.get_text()
 
     def user_prompt(self):
         return Prompt().ask(
-            prompt="[bold cyan]You>[/bold cyan] ", console=self.console_adapter.console
+            prompt=f"[bold cyan]You ({self.user_id})>[/bold cyan] ",
+            console=self.console_adapter.console,
         )
 
     def execute_agent(
@@ -397,7 +428,7 @@ class LunaHub:
         message: str | MessageContent | List[MessageContent],
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         suppress_thinking: bool = False,
-        token_replacements: Optional[Dict[str, str]] = None,
+        replacements: Optional[Dict[str, Any]] = None,
     ) -> AgentResponse:
         """
         Execute a specific agent with proper context management.
@@ -407,7 +438,7 @@ class LunaHub:
             message: Input message for the agent
             conversation_history: Optional history to include
             suppress_thinking: Whether to suppress the thinking message for this agent
-            token_replacements: Optional dictionary of token replacements to use for this agent's system prompt
+            replacements: Optional dictionary of token replacements to use for this agent's system prompt
 
         Returns:
             The final AgentResponse after all tool processing
@@ -417,20 +448,27 @@ class LunaHub:
             raise ValueError(f"Agent {agent_name} not found")
 
         agent = self.agents[agent_name]
-        token_replacements = token_replacements or {}
+        replacements = replacements or {}
 
         # Fill in emotional state tokens if the agent needs it
-        if agent.config.emotion_block:
+        if agent.config.features.get("emotion_block", False):
             emotional_state = self.emotion_service.get_current_state()
-            token_replacements["PAD_PLEASURE"] = emotional_state.pleasure.__str__()
-            token_replacements["PAD_AROUSAL"] = emotional_state.arousal.__str__()
-            token_replacements["PAD_DOMINANCE"] = emotional_state.dominance.__str__()
-            token_replacements["PAD_DESCRIPTOR"] = self.emotion_service.get_emotion_label()
+            emotional_block = {
+                "YourKnowledge/EmotionalState/Pleasure": emotional_state.pleasure.__str__(),
+                "YourKnowledge/EmotionalState/Arousal": emotional_state.arousal.__str__(),
+                "YourKnowledge/EmotionalState/Dominance": emotional_state.dominance.__str__(),
+                "YourKnowledge/EmotionalState/Descriptor": self.emotion_service.get_emotion_label(),
+            }
+            replacements.update(emotional_block)
+        if agent.config.features.get("working_memory", False):
+            working_memory = self._get_working_memory()
+            for key, value in working_memory.items():
+                replacements[f"YourKnowledge/WorkingMemory/{key}"] = value
 
         # Compile the system prompt with dynamic token replacement
         compiled_prompt = self.prompt_service.compile_prompt(
             agent_name=agent_name,
-            token_replacements=token_replacements,
+            replacements=replacements,
         )
 
         # Update the agent's system prompt with the compiled version
@@ -448,6 +486,9 @@ class LunaHub:
                 thought_content=agent_response.get_text_content(),
                 agent=agent_name,
             )
+            self.conversation_service.add_internal_thinking_message(
+                MessageContent.make_text(agent_response.get_text_content()), agent_name
+            )
 
         return agent_response
 
@@ -458,7 +499,7 @@ class LunaHub:
         max_depth: int = 5,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         reset_depth_for_agents: bool = True,
-        token_replacements: Optional[Dict[str, str]] = None,
+        replacements: Optional[Dict[str, str]] = None,
     ) -> AgentResponse:
         """
         Execute a routing instruction with proper tracking.
@@ -469,7 +510,7 @@ class LunaHub:
             max_depth: Maximum routing depth allowed
             conversation_history: Optional history to include
             reset_depth_for_agents: Whether to reset depth counter when routing to a new agent
-            token_replacements: Optional dictionary of token replacements to use for this agent's system prompt
+            replacements: Optional dictionary of token replacements to use for this agent's system prompt
 
         Returns:
             The final response after routing execution
@@ -483,7 +524,7 @@ class LunaHub:
                     error=True,
                 ),
                 conversation_history=conversation_history,
-                token_replacements=token_replacements,
+                replacements=replacements,
             )
 
         # When routing between agents, we can optionally reset the depth counter
@@ -524,13 +565,14 @@ class LunaHub:
                         target_agent=target_agent,
                         message=routing.tool_call.tool_input.get("message", "*unspecified*"),
                     )
+                    self.conversation_service.add_internal_routing_message(routing)
 
                 # Execute the target agent with token replacement
                 target_response = self.execute_agent(
                     agent_name=target_agent,
                     message=routed_message,
                     conversation_history=conversation_history,
-                    token_replacements=token_replacements,
+                    replacements=replacements,
                 )
 
                 # If target agent is using tools, process those
@@ -544,7 +586,7 @@ class LunaHub:
                             max_depth=max_depth,
                             conversation_history=conversation_history,
                             reset_depth_for_agents=reset_depth_for_agents,
-                            token_replacements=token_replacements,
+                            replacements=replacements,
                         )
                         # Format result for source agent
                         routing_result = {
@@ -568,6 +610,9 @@ class LunaHub:
                             target_agent=target_agent,
                             message=target_response.get_text_content(),
                         )
+                        self.conversation_service.add_internal_routing_response_message(
+                            routing, target_response.get_text_content()
+                        )
 
                     # Format result for source agent
                     routing_result = {
@@ -589,6 +634,10 @@ class LunaHub:
                     source_agent=routing.source_agent.value,
                     tool_name=routing.tool_call.tool_name,
                     tool_input=routing.tool_call.tool_input,
+                )
+                self.conversation_service.add_internal_tool_call_message(
+                    routing=routing,
+                    agent=routing.source_agent.value,
                 )
 
             tool_name = routing.tool_call.tool_name
@@ -692,6 +741,11 @@ class LunaHub:
                         else "No output provided"
                     ),
                 )
+                self.conversation_service.add_internal_tool_response_message(
+                    content=MessageContent.make_text(json.dumps(routing_result)),
+                    agent=routing.source_agent.value,
+                    tool_name=routing.tool_call.tool_name,
+                )
 
         # Format the tool result for the source agent
         for i, tool in enumerate(tool_response):
@@ -702,7 +756,7 @@ class LunaHub:
             agent_name=routing.source_agent.value,
             message=tool_response,
             conversation_history=conversation_history,
-            token_replacements=token_replacements,
+            replacements=replacements,
         )
 
         # If source agent is using more tools, process those
@@ -714,7 +768,7 @@ class LunaHub:
                     conversation_history=conversation_history,
                     max_depth=max_depth,
                     reset_depth_for_agents=False,
-                    token_replacements=token_replacements,
+                    replacements=replacements,
                 )
 
         return final_response
@@ -759,26 +813,25 @@ class LunaHub:
         Please format this as a natural response from Luna to the user, maintaining her personality.
         """
 
-    def _get_working_memory(self, user_id: str, user_message: str) -> str:
+    def _get_working_memory(self) -> Dict[str, List[WorkingMemory]]:
         """
         Get working memory relevant to the current conversation turn.
-
-        This method would retrieve memories from a memory database or service
-        that are most relevant to the current conversation context.
-
-        Args:
-            user_id: The user's ID
-            user_message: The user's message
 
         Returns:
             String containing the working memory content
         """
-        # This is a placeholder implementation
-        # In a full implementation, this would query a memory service or database
-        # to retrieve memories based on relevance to the current conversation
-
-        # For now, just return a simple message
-        return "No specific memories have been retrieved at this time."
+        working_memory = {}
+        for memory_id, memory in self.memory_service.get_working_memory().items():
+            if not hasattr(working_memory, memory.type.value):
+                working_memory[memory.type.value] = []
+            working_memory[memory.type.value].append(
+                {
+                    "id": memory_id,
+                    "content": memory.content,
+                    "importance": memory.importance,
+                }
+            )
+        return working_memory
 
     def _process_heartbeat(self) -> str:
         """
@@ -892,3 +945,13 @@ class LunaHub:
             Dictionary of statistics
         """
         return self.execution_stats.copy()
+
+    def _shutdown(self):
+        exit()
+
+    def _login(self):
+        self.user_id = Prompt.ask(
+            prompt="Please enter your user ID",
+            default=self.user_id,
+            console=self.console_adapter.console,
+        )

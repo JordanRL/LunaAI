@@ -9,6 +9,7 @@ import traceback
 from typing import Any, Dict, List, Optional
 
 from domain.models.emotion import EmotionalState
+from domain.models.enums import WorkingMemoryType
 from domain.models.memory import (
     EmotionalMemory,
     EpisodicMemory,
@@ -17,6 +18,7 @@ from domain.models.memory import (
     MemoryResult,
     RelationshipMemory,
     SemanticMemory,
+    WorkingMemory,
 )
 from domain.models.tool import Tool, ToolCategory
 from services.memory_service import MemoryService
@@ -207,5 +209,128 @@ Query effectively by:
                 "memories": [],
                 "query": tool_input.get("query", ""),
                 "total_found": 0,
+                "error": str(e),
+            }
+
+
+class WorkingMemoryWriteTool(Tool):
+    """Tool for creating memories in Luna's working memory using the memory service."""
+
+    def __init__(self, memory_service: MemoryService):
+        self.memory_service = memory_service
+        super().__init__(
+            name="add_working_memory",
+            description="""Adds a working memory that will be persistently available in the system prompt.
+
+This tool allows for a short-term memory to be added to Luna's working memory. It is
+useful for preserving information that is relevant to this conversation but doesn't
+deserve to be permanently remembered in Luna's long-term memory.
+
+Working Memory Types:
+- fact: Temporary factual information useful for the current conversation
+- event: Minor events that don't warrant a long-term memory
+- insight: Realizations or connections made during conversation
+- goal: Temporary objectives or intentions for the current conversation
+- emotion: Current emotional states or reactions
+- thought: Key reasoning chains or inner monologue elements
+
+When To Use:
+- To preserve aspects of inner thinking and inner monologue, which are not otherwise
+preserved between conversation turns
+- To remember temporary or contextual information such as goals, ideas, and facts that
+are mostly or entirely relevant to this conversation only
+- To maintain Luna's inner world and thoughts in a coherent and consistent way
+
+The importance value determines how many conversation turns this memory will persist
+(default: 5). Higher importance (up to 10) means the memory will last longer.""",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "The content of the working memory",
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Type of working memory",
+                        "enum": [mem_type.value for mem_type in WorkingMemoryType],
+                    },
+                    "importance": {
+                        "type": "integer",
+                        "description": "How many conversation turns this should persist in the working memory",
+                        "minimum": 1,
+                        "maximum": 10,
+                        "default": 5,
+                    },
+                },
+                "required": ["content", "type"],
+            },
+            handler=self.handle,
+            category=ToolCategory.MEMORY,
+        )
+        self.memory_service = memory_service
+
+    def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            new_working_memory = WorkingMemory(
+                type=WorkingMemoryType(tool_input.get("type")),
+                content=tool_input.get("content"),
+                importance=tool_input.get("importance"),
+            )
+            self.memory_service.add_working_memory(new_working_memory)
+            return {
+                "success": True,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+            }
+
+
+class WorkingMemoryUpdateTool(Tool):
+    """Tool for updating memories in Luna's working memory using the memory service."""
+
+    def __init__(self, memory_service: MemoryService):
+        self.memory_service = memory_service
+        super().__init__(
+            name="refresh_working_memory",
+            description="""Refresh working memory importance to make the memory last longer
+
+This tool lets you set the importance on a working memory to let it persist
+for a longer period of time. Typically, the importance decays are a rate of
+1 per conversation turn.""",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The working memory id",
+                    },
+                    "importance": {
+                        "type": "integer",
+                        "description": "How many conversation turns this should persist in the working memory",
+                        "minimum": 1,
+                        "maximum": 10,
+                    },
+                },
+                "required": ["id", "importance"],
+            },
+            handler=self.handle,
+            category=ToolCategory.MEMORY,
+        )
+        self.memory_service = memory_service
+
+    def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            self.memory_service.refresh_working_memory(
+                tool_input.get("id"), tool_input.get("importance")
+            )
+            return {
+                "success": True,
+            }
+        except Exception as e:
+            return {
+                "success": False,
                 "error": str(e),
             }

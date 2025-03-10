@@ -32,6 +32,7 @@ def main():
         memory_service = None
 
     luna_hub = LunaHub(
+        user_id="Jordan",
         console_adapter=console_adapter,
         conversation_service=conversation_service,
         emotion_service=emotion_service,
@@ -41,13 +42,12 @@ def main():
         persona_service=persona_service,
     )
 
-    user_id = "Jordan"
     while True:
         user_message = luna_hub.user_prompt()
 
-        console_adapter.display_user_message(user_message, user_id)
+        console_adapter.display_user_message(user_message, luna_hub.user_id)
 
-        luna_response = luna_hub.process_message(user_message, user_id)
+        luna_response = luna_hub.process_message(user_message)
 
         console_adapter.display_assistant_message(luna_response)
 

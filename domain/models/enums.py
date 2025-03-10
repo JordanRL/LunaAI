@@ -2,6 +2,17 @@ from enum import Enum
 from typing import List
 
 
+class WorkingMemoryType(Enum):
+    """Types of working memory."""
+
+    FACT = "fact"  # To preserve a fact that is useful for this conversation but that Luna doesn't need to remember later
+    EVENT = "event"  # To preserve a minor even that doesn't warrant a long-term memory
+    INSIGHT = "insight"  # To preserve an insight
+    GOAL = "goal"  # To preserve a temporary goal in the current conversation
+    EMOTION = "emotion"  # To preserve an emotion
+    THOUGHT = "thought"  # For chain of thought preservation
+
+
 class AgentType(Enum):
     """
     Available agent types for routing.

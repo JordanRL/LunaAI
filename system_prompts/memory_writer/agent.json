@@ -1,7 +1,7 @@
 {
   "name": "memory_writer",
   "description": "Luna's memory formation system that identifies meaningful, emotionally significant, or factually important information from conversations and experiences, decides what deserves to be remembered long-term, and encodes these memories in a way that accurately preserves context and significance",
-  "model": "claude-3-7-sonnet-latest",
+  "model": "claude-3-5-haiku-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
   "tools": [
@@ -11,7 +11,7 @@
   ],
   "features": {
     "persona_config": {
-      "identity": true,
+      "identity": "low",
       "personality": false,
       "backstory": false,
       "values": false,

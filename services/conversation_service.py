@@ -4,6 +4,7 @@ Conversation service interface for Luna.
 This module defines the interface for conversation management.
 """
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from domain.models.content import MessageContent
 from domain.models.conversation import Conversation
 from domain.models.messages import Message
+from domain.models.routing import RoutingInstruction
 from services.user_service import UserService
 
 
@@ -79,6 +81,85 @@ class ConversationService:
         self.conversations[conversation_id] = conversation
 
         return conversation
+
+    def create_internal_conversation(self):
+        conversation_id = str(uuid.uuid4())
+        conversation = Conversation(
+            conversation_id=conversation_id, user_id="internal", start_time=datetime.now()
+        )
+
+        self.conversations["internal"] = conversation
+        return conversation
+
+    def add_internal_thinking_message(self, content: MessageContent, agent: str):
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+
+        conversation.add_message(Message(role=agent, content=[content]))
+        return self
+
+    def add_internal_tool_call_message(self, routing: RoutingInstruction, agent: str):
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+        conversation.add_message(
+            Message(
+                role=agent + "_calling_tool_" + routing.tool_call.tool_name,
+                content=[MessageContent.make_text(json.dumps(routing.tool_call.tool_input))],
+            )
+        )
+        return self
+
+    def add_internal_tool_response_message(
+        self, content: MessageContent, agent: str, tool_name: str
+    ):
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+        conversation.add_message(
+            Message(role=tool_name + "_responding_to_" + agent, content=[content])
+        )
+        return self
+
+    def add_internal_routing_message(self, routing: RoutingInstruction):
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+        conversation.add_message(
+            Message(
+                role=routing.source_agent.value
+                + "_routing_to_agent_"
+                + routing.tool_call.tool_input.get("target_agent"),
+                content=[MessageContent.make_text(routing.tool_call.tool_input.get("message"))],
+            )
+        )
+        return self
+
+    def add_internal_routing_response_message(self, routing: RoutingInstruction, response: str):
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+        conversation.add_message(
+            Message(
+                role=routing.tool_call.tool_input.get("target_agent")
+                + "_responding_to_agent"
+                + routing.source_agent.value,
+                content=[MessageContent.make_text(response)],
+            )
+        )
+        return self
+
+    def compile_internal(self):
+        result = ""
+        conversation = self.get_conversation("internal")
+        if not conversation:
+            raise ValueError("Conversation internal not found")
+
+        for message in conversation.messages:
+            result += f"{message.role}: {message.content[0].text}\n\n"
+
+        return result
 
     def add_user_message(self, conversation_id: str, content: MessageContent) -> Conversation:
         """

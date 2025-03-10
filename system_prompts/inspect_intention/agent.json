@@ -1,7 +1,7 @@
 {
   "name": "inspect_intention",
   "description": "Analytical module that evaluates user messages to identify underlying intentions, goals, and implicit requests – helping Luna understand what users truly want or need beyond their explicit statements",
-  "model": "claude-3-7-sonnet-latest",
+  "model": "claude-3-5-haiku-latest",
   "max_tokens": 2000,
   "temperature": 0.7,
   "tools": [],

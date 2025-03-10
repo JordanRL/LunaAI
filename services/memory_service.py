@@ -5,7 +5,7 @@ This module defines the interface for memory storage and retrieval.
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from dateutil.parser import parse as parse_date
 
@@ -23,6 +23,7 @@ from domain.models.memory import (
     RelationshipMemoryQuery,
     SemanticMemory,
     SemanticMemoryQuery,
+    WorkingMemory,
 )
 
 
@@ -43,6 +44,53 @@ class MemoryService:
         self.es_adapter = es_adapter
         self._memory_cache = {}  # Simple in-memory cache: memory_id -> (memory, timestamp)
         self._cache_ttl = 300  # Cache TTL in seconds (5 minutes)
+        self._working_memory: Dict[str, WorkingMemory] = {}
+
+    def get_working_memory(self) -> Optional[Dict[str, WorkingMemory]]:
+        """
+        Return all working memories.
+        """
+        return self._working_memory
+
+    def add_working_memory(self, working_memory: WorkingMemory) -> None:
+        """
+        Add a working memory to the list.
+
+        Args:
+            working_memory: The working memory to add.
+        """
+        if self._working_memory is None:
+            self._working_memory = {}
+        self._working_memory[working_memory.id] = working_memory
+
+    def decay_working_memory(self) -> None:
+        """
+        Decay all working memories and remove those that have reached 0 importance.
+        """
+        # Create a list of keys to avoid modifying dict during iteration
+        for memory_id in list(self._working_memory.keys()):
+            working_memory = self._working_memory[memory_id]
+            new_importance = working_memory.importance - 1
+            if new_importance <= 0:
+                del self._working_memory[memory_id]
+            else:
+                working_memory.importance = new_importance
+                self._working_memory[memory_id] = working_memory
+
+    def delete_working_memory(self, working_memory: WorkingMemory | str) -> None:
+        if isinstance(working_memory, WorkingMemory):
+            del self._working_memory[working_memory.id]
+        elif isinstance(working_memory, str):
+            del self._working_memory[working_memory]
+
+    def clear_working_memory(self) -> None:
+        self._working_memory = {}
+
+    def refresh_working_memory(self, working_memory: WorkingMemory | str, importance: int) -> None:
+        if isinstance(working_memory, WorkingMemory):
+            self._working_memory[working_memory.id].importance = importance
+        elif isinstance(working_memory, str):
+            self._working_memory[working_memory].importance = importance
 
     def store_memory(self, memory: Memory) -> Optional[str]:
         """

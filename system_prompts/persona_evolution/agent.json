@@ -12,9 +12,9 @@
       "identity": true,
       "personality": true,
       "backstory": true,
-      "values": false,
-      "beliefs": false,
-      "relationships": false
+      "values": true,
+      "beliefs": true,
+      "relationships": true
     },
     "emotion_block": false,
     "intuition": false,

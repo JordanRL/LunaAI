@@ -4,6 +4,19 @@ from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional
 
 from domain.models.emotion import EmotionalState
+from domain.models.enums import WorkingMemoryType
+
+
+@dataclass
+class WorkingMemory:
+    """
+    Represents a working memory in Luna's memory system.
+    """
+
+    type: WorkingMemoryType
+    content: str
+    importance: int
+    id: Optional[str] = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 @dataclass

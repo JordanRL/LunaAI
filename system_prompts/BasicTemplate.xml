@@ -1,0 +1,10 @@
+<SystemPrompt>
+    <YourRole>
+        <!-- This describes what the purpose is of your interaction -->
+
+    </YourRole>
+    <YourBehavior>
+        <!-- This describes what you should try to accomplish -->
+
+    </YourBehavior>
+</SystemPrompt>

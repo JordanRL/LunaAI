@@ -9,10 +9,10 @@
     "persona_config": {
       "identity": true,
       "personality": true,
-      "backstory": false,
-      "values": false,
-      "beliefs": false,
-      "relationships": false
+      "backstory": true,
+      "values": true,
+      "beliefs": true,
+      "relationships": true
     },
     "emotion_block": false,
     "intuition": false,
