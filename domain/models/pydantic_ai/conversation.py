@@ -1,14 +1,14 @@
-import uuid
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+from uuid import uuid4
 
-from domain.models.content import MessageContent
-from domain.models.messages import Message
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from domain.models.pydantic_ai.content import MessageContent
+from domain.models.pydantic_ai.messages import Message
 
 
-@dataclass
-class ConversationSummary:
+class ConversationSummary(BaseModel):
     """
     Summary of a portion of a conversation.
 
@@ -23,14 +23,16 @@ class ConversationSummary:
     content: str
     range: Tuple[int, int]  # start_idx, end_idx
     message_ids: List[str]
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     original_text: Optional[str] = None
 
 
-@dataclass
-class Conversation:
+class Conversation(BaseModel):
     """
     Represents a conversation between Luna and a user.
+
+    This model is used to track message history and provides
+    utility methods for adding messages and generating summaries.
 
     Attributes:
         conversation_id: Unique identifier for this conversation
@@ -41,16 +43,19 @@ class Conversation:
         metadata: Additional data associated with this conversation
     """
 
-    conversation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str = Field(default_factory=lambda: str(uuid4()))
     user_id: str = "default_user"
-    messages: List[Message] = field(default_factory=list)
-    summaries: List[ConversationSummary] = field(default_factory=list)
-    start_time: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    _summarized_ranges: List[Tuple[int, int]] = field(default_factory=list)
+    messages: List[Message] = Field(default_factory=list)
+    summaries: List[ConversationSummary] = Field(default_factory=list)
+    start_time: datetime = Field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    _summarized_ranges: List[Tuple[int, int]] = Field(default_factory=list, exclude=True)
 
     def add_message(self, message: Message) -> "Conversation":
         """Add a message to the conversation."""
+        if message.role not in ["user", "assistant", "system"]:
+            raise ValueError(f"Invalid role: {message.role}")
+
         self.messages.append(message)
         return self
 
@@ -60,11 +65,14 @@ class Conversation:
         """Add a user message to the conversation."""
         if isinstance(content, str):
             message = Message.user(content)
-        elif isinstance(content, MessageContent):
+        elif isinstance(content, dict) and "type" in content:
+            # Assume it's a content dict
             message = Message(role="user", content=[content])
-        elif isinstance(content, list) and all(
-            isinstance(item, MessageContent) for item in content
-        ):
+        elif isinstance(content, BaseModel) and hasattr(content, "type"):
+            # Assume it's a MessageContent
+            message = Message(role="user", content=[content])
+        elif isinstance(content, list):
+            # Assume list of MessageContent
             message = Message(role="user", content=content)
         elif isinstance(content, Message):
             if content.role != "user":
@@ -82,11 +90,14 @@ class Conversation:
         """Add an assistant message to the conversation."""
         if isinstance(content, str):
             message = Message.assistant(content)
-        elif isinstance(content, MessageContent):
+        elif isinstance(content, dict) and "type" in content:
+            # Assume it's a content dict
             message = Message(role="assistant", content=[content])
-        elif isinstance(content, list) and all(
-            isinstance(item, MessageContent) for item in content
-        ):
+        elif isinstance(content, BaseModel) and hasattr(content, "type"):
+            # Assume it's a MessageContent
+            message = Message(role="assistant", content=[content])
+        elif isinstance(content, list):
+            # Assume list of MessageContent
             message = Message(role="assistant", content=content)
         elif isinstance(content, Message):
             if content.role != "assistant":
@@ -105,7 +116,7 @@ class Conversation:
         return self
 
     def add_user_tool_result(
-        self, tool_id: str, result: Any, error: Optional[str] = None
+        self, tool_id: str, result: Any, error: bool = False
     ) -> "Conversation":
         """Add a user message with a tool result."""
         message = Message.user_with_tool_result(tool_id, result, error)
@@ -131,3 +142,8 @@ class Conversation:
     def get_metadata(self, key: str) -> Any:
         """Get metadata from this message."""
         return self.metadata.get(key, None)
+
+    # Integration with PydanticAI's MessageHistory
+    def to_message_history(self) -> List[Dict[str, Any]]:
+        """Convert to PydanticAI's message history format."""
+        return [msg.to_dict() for msg in self.messages]

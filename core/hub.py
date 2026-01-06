@@ -101,14 +101,26 @@ class LunaHub:
         import json
         import os
 
-        from adapters.anthropic_adapter import AnthropicAdapter
+        from adapters.adapter_factory import AdapterFactory
         from core.agent import Agent
         from domain.models.agent import AgentConfig
         from domain.models.enums import AgentType
 
-        # Get the API key from environment
+        # Get the API key from environment and create the appropriate adapter
         api_keys = get_api_keys()
-        api_adapter = AnthropicAdapter(api_key=api_keys.anthropic_api_key)
+
+        # Get the provider from app config, or default to Anthropic
+        provider = self.app_config.provider if hasattr(self.app_config, "provider") else "anthropic"
+
+        # Get the appropriate API key based on the provider
+        api_key = api_keys.anthropic_api_key
+        if provider == "openai":
+            api_key = api_keys.openai_api_key if hasattr(api_keys, "openai_api_key") else None
+        elif provider == "gemini":
+            api_key = api_keys.gemini_api_key if hasattr(api_keys, "gemini_api_key") else None
+
+        # Create the adapter using the factory
+        api_adapter = AdapterFactory.create(provider=provider, api_key=api_key)
 
         self.agents = {}
         system_prompts_dir = os.path.join(
@@ -211,7 +223,7 @@ class LunaHub:
             # Create AgentConfig
             agent_config = AgentConfig(
                 name=AgentType(agent_name),
-                model=agent_config_data.get("model", "claude-3-7-sonnet-latest"),
+                model=agent_config_data.get("model", "claude-sonnet-4-5"),
                 tools=tools,
                 allowed_tools=allowed_tools,
                 max_tokens=agent_config_data.get("max_tokens", 4000),
@@ -368,8 +380,11 @@ class LunaHub:
 
         # Process routing instructions if any
         if dispatcher_response.is_using_tools():
-            for route in dispatcher_response.routing:
-                dispatcher_response = self.execute_routing(routing=route, depth=0, max_depth=6)
+            dispatcher_response = self._process_routing_loop(
+                agent_response=dispatcher_response,
+                depth=0,
+                max_depth=6,
+            )
 
         # Format final response with outputter
         formatted_content = self._prepare_output_content(user_message, dispatcher_response)
@@ -492,44 +507,102 @@ class LunaHub:
 
         return agent_response
 
-    def execute_routing(
+    def _process_routing_loop(
         self,
-        routing: RoutingInstruction,
+        agent_response: AgentResponse,
         depth: int = 0,
         max_depth: int = 5,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
-        reset_depth_for_agents: bool = True,
         replacements: Optional[Dict[str, str]] = None,
     ) -> AgentResponse:
         """
-        Execute a routing instruction with proper tracking.
+        Process all routing instructions in an agent response until no more tools are used.
 
         Args:
-            routing: The routing instruction to execute
-            depth: Current routing depth (for loop detection)
-            max_depth: Maximum routing depth allowed
-            conversation_history: Optional history to include
-            reset_depth_for_agents: Whether to reset depth counter when routing to a new agent
-            replacements: Optional dictionary of token replacements to use for this agent's system prompt
+            agent_response: The initial response from the agent
+            depth: Current routing depth
+            max_depth: Maximum routing depth
+            conversation_history: Optional history
+            replacements: Optional token replacements
 
         Returns:
-            The final response after routing execution
+            The final AgentResponse
         """
-        if depth >= max_depth:
-            return self.execute_agent(
-                agent_name=routing.source_agent.value,
-                message=MessageContent.simple_tool_result(
-                    tool_id=routing.tool_call.tool_id,
-                    output="Maximum tool calls this conversation turn reached. Please provide the user a response.",
-                    error=True,
-                ),
+        current_response = agent_response
+        current_depth = depth
+
+        while current_response.is_using_tools():
+            if current_depth >= max_depth:
+                # Handle max depth by sending an error result for ALL tools
+                # This stops the loop
+                tool_results = []
+                source_agent_name = current_response.routing[0].source_agent.value
+
+                for route in current_response.routing:
+                    tool_results.append(
+                        MessageContent.simple_tool_result(
+                            tool_id=route.tool_call.tool_id,
+                            output="Maximum tool calls this conversation turn reached. Please provide the user a response.",
+                            error=True,
+                        )
+                    )
+
+                return self.execute_agent(
+                    agent_name=source_agent_name,
+                    message=tool_results,
+                    conversation_history=conversation_history,
+                    replacements=replacements,
+                )
+
+            # Collect results for ALL tool calls in this turn
+            tool_results = []
+            source_agent_name = current_response.routing[0].source_agent.value
+
+            for route in current_response.routing:
+                # Execute each instruction
+                result_content = self._execute_single_tool_call(
+                    routing=route,
+                    depth=current_depth,
+                    max_depth=max_depth,
+                    conversation_history=conversation_history,
+                    replacements=replacements,
+                )
+                tool_results.append(result_content)
+
+            # Send all results back to the source agent
+            current_response = self.execute_agent(
+                agent_name=source_agent_name,
+                message=tool_results,
                 conversation_history=conversation_history,
                 replacements=replacements,
             )
 
-        # When routing between agents, we can optionally reset the depth counter
-        next_depth = 0 if reset_depth_for_agents else depth + 1
-        tool_response = []
+            current_depth += 1
+
+        return current_response
+
+    def _execute_single_tool_call(
+        self,
+        routing: RoutingInstruction,
+        depth: int,
+        max_depth: int,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        replacements: Optional[Dict[str, str]] = None,
+    ) -> MessageContent:
+        """
+        Execute a single routing instruction and return the result content.
+
+        Args:
+            routing: The routing instruction
+            depth: Current depth
+            max_depth: Max depth
+            conversation_history: Optional history
+            replacements: Optional replacements
+
+        Returns:
+            MessageContent containing the tool result
+        """
+        tool_response = None
         routing_result = None
         error_result = None
 
@@ -543,8 +616,8 @@ class LunaHub:
             routed_message += f"\n\n{message}"
 
             if target_agent is None or target_agent not in self.agents:
-                # Build the ToolResponse object for the error to allow the agent to try something else
-                tool_response.append(
+                # Agent doesn't exist
+                return MessageContent.make_tool_result(
                     ToolResponse(
                         tool_id=routing.tool_call.tool_id,
                         content=json.dumps(
@@ -575,59 +648,41 @@ class LunaHub:
                     replacements=replacements,
                 )
 
-                # If target agent is using tools, process those
-                if target_response.is_using_tools():
-                    target_response_tools = []
-                    for route in target_response.routing:
-                        # Recursively call this function for tools from the target agent
-                        target_response_tools = self.execute_routing(
-                            routing=route,
-                            depth=next_depth,
-                            max_depth=max_depth,
-                            conversation_history=conversation_history,
-                            reset_depth_for_agents=reset_depth_for_agents,
-                            replacements=replacements,
-                        )
-                        # Format result for source agent
-                        routing_result = {
-                            "result": "Routing completed successfully",
-                            "content": target_response_tools.get_text_content(),
-                            "target_agent": target_agent,
-                        }
+                # Process any tools the target agent wants to use
+                # We reset depth for the new agent context (depth=0)
+                final_target_response = self._process_routing_loop(
+                    agent_response=target_response,
+                    depth=0,
+                    max_depth=max_depth,
+                    conversation_history=conversation_history,
+                    replacements=replacements,
+                )
 
-                        # Build the ToolResponse object
-                        tool_response.append(
-                            ToolResponse(
-                                tool_id=routing.tool_call.tool_id,
-                                content=json.dumps(routing_result),
-                            )
-                        )
-                else:
-                    # Add event for routing response
-                    if True:
-                        self.console_adapter.display_agent_response(
-                            source_agent=routing.source_agent.value,
-                            target_agent=target_agent,
-                            message=target_response.get_text_content(),
-                        )
-                        self.conversation_service.add_internal_routing_response_message(
-                            routing, target_response.get_text_content()
-                        )
-
-                    # Format result for source agent
-                    routing_result = {
-                        "result": "Routing completed successfully",
-                        "content": target_response.get_text_content(),
-                        "target_agent": target_agent,
-                    }
-
-                    # Build the ToolResponse object
-                    tool_response.append(
-                        ToolResponse(
-                            tool_id=routing.tool_call.tool_id, content=json.dumps(routing_result)
-                        )
+                # Add event for routing response
+                if True:
+                    self.console_adapter.display_agent_response(
+                        source_agent=routing.source_agent.value,
+                        target_agent=target_agent,
+                        message=final_target_response.get_text_content(),
                     )
+                    self.conversation_service.add_internal_routing_response_message(
+                        routing, final_target_response.get_text_content()
+                    )
+
+                # Format result for source agent
+                routing_result = {
+                    "result": "Routing completed successfully",
+                    "content": final_target_response.get_text_content(),
+                    "target_agent": target_agent,
+                }
+
+                return MessageContent.make_tool_result(
+                    ToolResponse(
+                        tool_id=routing.tool_call.tool_id, content=json.dumps(routing_result)
+                    )
+                )
         else:
+            # Standard tool call
             # Add event to queue for tool call
             if True:
                 self.console_adapter.display_tool_call(
@@ -657,12 +712,9 @@ class LunaHub:
                             # Invoke the tool with proper error handling
                             routing_result = tool.handler(tool_input)
 
-                            # Build the ToolResponse for the tool handler
-                            tool_response.append(
-                                ToolResponse(
-                                    tool_id=routing.tool_call.tool_id,
-                                    content=json.dumps(routing_result),
-                                )
+                            tool_response = ToolResponse(
+                                tool_id=routing.tool_call.tool_id,
+                                content=json.dumps(routing_result),
                             )
                         except Exception as tool_error:
                             # Handle any exceptions during tool input preparation or execution
@@ -671,12 +723,10 @@ class LunaHub:
                                 "message": f"Error executing tool {tool_name}: {str(tool_error)}",
                                 "error": str(tool_error),
                             }
-                            tool_response.append(
-                                ToolResponse(
-                                    tool_id=routing.tool_call.tool_id,
-                                    content=json.dumps(error_result),
-                                    is_error=True,
-                                )
+                            tool_response = ToolResponse(
+                                tool_id=routing.tool_call.tool_id,
+                                content=json.dumps(error_result),
+                                is_error=True,
                             )
                     else:
                         # The agent is not allowed access to the requested tool
@@ -685,14 +735,10 @@ class LunaHub:
                             "tool_name": routing.tool_call.tool_name,
                             "content": f"The agent {routing.source_agent.value} does not have permission to use the {tool_name} tool.",
                         }
-
-                        # Build the ToolResponse for the error
-                        tool_response.append(
-                            ToolResponse(
-                                tool_id=routing.tool_call.tool_id,
-                                content=json.dumps(routing_result),
-                                is_error=True,
-                            )
+                        tool_response = ToolResponse(
+                            tool_id=routing.tool_call.tool_id,
+                            content=json.dumps(routing_result),
+                            is_error=True,
                         )
                 else:
                     # The tool doesn't exist or doesn't have a handler
@@ -701,14 +747,10 @@ class LunaHub:
                         "tool_name": routing.tool_call.tool_name,
                         "content": f"The tool {tool_name} is not available or could not be loaded.",
                     }
-
-                    # Build the ToolResponse for the error
-                    tool_response.append(
-                        ToolResponse(
-                            tool_id=routing.tool_call.tool_id,
-                            content=json.dumps(routing_result),
-                            is_error=True,
-                        )
+                    tool_response = ToolResponse(
+                        tool_id=routing.tool_call.tool_id,
+                        content=json.dumps(routing_result),
+                        is_error=True,
                     )
             except Exception as e:
                 # Handle any exceptions that occur during tool execution
@@ -718,14 +760,10 @@ class LunaHub:
                     "tool_name": routing.tool_call.tool_name,
                     "content": f"Error executing tool {tool_name}: {error_msg}",
                 }
-
-                # Build the ToolResponse for the error
-                tool_response.append(
-                    ToolResponse(
-                        tool_id=routing.tool_call.tool_id,
-                        content=json.dumps(routing_result),
-                        is_error=True,
-                    )
+                tool_response = ToolResponse(
+                    tool_id=routing.tool_call.tool_id,
+                    content=json.dumps(routing_result),
+                    is_error=True,
                 )
 
             # Add event to queue for tool response
@@ -742,36 +780,12 @@ class LunaHub:
                     ),
                 )
                 self.conversation_service.add_internal_tool_response_message(
-                    content=MessageContent.make_text(json.dumps(routing_result)),
+                    content=MessageContent.make_text(tool_response.content),
                     agent=routing.source_agent.value,
                     tool_name=routing.tool_call.tool_name,
                 )
 
-        # Format the tool result for the source agent
-        for i, tool in enumerate(tool_response):
-            tool_response[i] = MessageContent.make_tool_result(tool)
-
-        # Execute the source agent with the tool result and token replacement
-        final_response = self.execute_agent(
-            agent_name=routing.source_agent.value,
-            message=tool_response,
-            conversation_history=conversation_history,
-            replacements=replacements,
-        )
-
-        # If source agent is using more tools, process those
-        if final_response.is_using_tools():
-            for route in final_response.routing:
-                final_response = self.execute_routing(
-                    routing=route,
-                    depth=next_depth,
-                    conversation_history=conversation_history,
-                    max_depth=max_depth,
-                    reset_depth_for_agents=False,
-                    replacements=replacements,
-                )
-
-        return final_response
+            return MessageContent.make_tool_result(tool_response)
 
     def _build_context_message(self, user_message: str, user_id: str) -> str:
         """
@@ -857,12 +871,11 @@ class LunaHub:
 
         # Process routing instructions if any
         if dispatcher_response.is_using_tools():
-            for route in dispatcher_response.routing:
-                dispatcher_response = self.execute_routing(
-                    routing=route,
-                    depth=0,
-                    max_depth=6,
-                )
+            dispatcher_response = self._process_routing_loop(
+                agent_response=dispatcher_response,
+                depth=0,
+                max_depth=6,
+            )
 
         # Store the heartbeat thought in memory
         # This would typically involve a call to a memory service

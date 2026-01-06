@@ -10,6 +10,40 @@ LunaAI is a multi-agent personality system designed to produce the most human-li
 - **Memory Systems**: Short and long-term memory mechanisms for contextual awareness
 - **Self-Reflection**: Internal thought processes for deeper reasoning capabilities
 - **Persona Evolution**: Dynamic personality development based on interactions
+- **Multi-Provider Support**: Flexible adapter interface supporting multiple LLM providers
+
+## LLM Provider Support
+
+Luna now supports multiple LLM providers through a unified adapter interface:
+
+- **Anthropic**: Claude models (default)
+- **OpenAI**: GPT-4 models
+- **Google**: Gemini models
+
+You can easily switch between providers by setting the `PROVIDER` environment variable:
+
+```bash
+# Use Anthropic Claude (default)
+export PROVIDER=anthropic
+
+# Use OpenAI GPT
+export PROVIDER=openai
+
+# Use Google Gemini
+export PROVIDER=gemini
+```
+
+### Provider Feature Comparison
+
+| Feature | Anthropic | OpenAI | Gemini |
+|---------|-----------|--------|--------|
+| Text Generation | ✅ | ✅ | ✅ |
+| Tool Calling | ✅ | ✅ | ✅ |
+| System Instructions | ✅ | ✅ | ✅ |
+| Content Blocks | ✅ | ❌ | ✅ |
+| Thinking Blocks | ✅ | ❌ | ❌ |
+| Image Input | ✅ | ✅ | ✅ |
+| Streaming | ✅ | ✅ | ✅ |
 
 ## Installation
 
@@ -20,6 +54,14 @@ cd luna-ai
 
 # Set up development environment
 ./scripts/setup_dev.sh
+
+# Set up your API keys (for the providers you want to use)
+export ANTHROPIC_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here
+export GEMINI_API_KEY=your_key_here
+
+# Set your preferred provider (optional, defaults to anthropic)
+export PROVIDER=anthropic
 ```
 
 ## Development
@@ -52,6 +94,12 @@ The project uses several tools to maintain code quality:
 
 # Run tests with coverage
 ./scripts/test.sh --coverage
+
+# Compare responses from different LLM providers
+./scripts/compare_adapters.py "Your question here?"
+
+# Compare providers with tools enabled
+./scripts/compare_adapters.py "Calculate 25 * 16" --with-tools
 ```
 
 ## Project Structure

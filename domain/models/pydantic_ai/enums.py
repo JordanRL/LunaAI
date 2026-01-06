@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List
 
 
+# We're keeping the Enum implementation the same, but could use StrEnum if desired
 class WorkingMemoryType(Enum):
     """Types of working memory."""
 
@@ -47,11 +48,17 @@ class AgentType(Enum):
         return [agent.value for agent in cls if agent.value not in exclude]
 
 
+# ContentType enum is expanded to support more provider-specific content types
 class ContentType(Enum):
     """Types of content in a message."""
 
+    # Basic content types (common across providers)
     TEXT = "text"
-    TOOL_CALL = "tool_use"  # Anthropic API uses "tool_use" for tool calls
-    TOOL_RESULT = "tool_result"
     IMAGE = "image"
-    # Add other content types as needed
+
+    # Tool-related content types
+    TOOL_CALL = "tool_use"
+    TOOL_RESULT = "tool_result"
+
+    # Other types
+    THINKING = "thinking"

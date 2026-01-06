@@ -10,15 +10,16 @@ import anthropic
 from anthropic.types import Message as AnthropicMessage
 from anthropic.types import TextBlock, ToolUseBlock
 
+from adapters.base_adapter import BaseAdapter
 from domain.models.agent import AgentConfig, AgentResponse
-from domain.models.content import MessageContent, ToolCall
+from domain.models.content import MessageContent, ToolCall, ToolResponse
 from domain.models.conversation import Conversation
 from domain.models.enums import ContentType
 from domain.models.messages import Message
 from domain.models.routing import RoutingInstruction
 
 
-class AnthropicAdapter:
+class AnthropicAdapter(BaseAdapter):
     """
     Adapter for interacting with Anthropic's API.
 
@@ -59,31 +60,31 @@ class AnthropicAdapter:
 
         api_request = {
             "system": system_prompt,
-            "messages": [msg.to_dict() for msg in history.messages],
+            "messages": self.convert_history_to_api_format(history.messages),
             "model": agent.model,
             "max_tokens": agent.max_tokens,
             "temperature": agent.temperature,
-            "tools": [tool.to_api_schema() for tool in agent.tools],
+            "tools": [self.convert_tool_schema(tool.to_api_schema()) for tool in agent.tools],
         }
 
         # Prepare the message based on its type
         if isinstance(message, str):
             # Create a simple text message
             message_obj = Message.user(message)
-            api_request["messages"].append(message_obj.to_dict())
+            api_request["messages"].append(self.convert_message_to_api_format(message_obj))
         elif isinstance(message, MessageContent):
             # Create a message with a single content item
             message_obj = Message(role="user", content=[message])
-            api_request["messages"].append(message_obj.to_dict())
+            api_request["messages"].append(self.convert_message_to_api_format(message_obj))
         elif isinstance(message, list) and all(
             isinstance(item, MessageContent) for item in message
         ):
             # Create a message with multiple content items
             message_obj = Message(role="user", content=message)
-            api_request["messages"].append(message_obj.to_dict())
+            api_request["messages"].append(self.convert_message_to_api_format(message_obj))
         elif isinstance(message, Message):
             # Use the message directly
-            api_request["messages"].append(message.to_dict())
+            api_request["messages"].append(self.convert_message_to_api_format(message))
         else:
             raise ValueError(f"Unsupported message type: {type(message)}")
 
@@ -171,3 +172,77 @@ class AnthropicAdapter:
             RoutingInstruction(source_agent=agent.name, tool_call=tool_call)
             for tool_call in tool_calls
         ]
+
+    def convert_message_to_api_format(self, message: Message) -> Dict[str, Any]:
+        """
+        Convert a Luna message to Anthropic's format.
+
+        For Anthropic, this uses message.to_dict() directly since our
+        internal Message structure is based on Anthropic's format.
+
+        Args:
+            message: Luna message to convert
+
+        Returns:
+            Dict: Message in Anthropic format
+        """
+        return message.to_dict()
+
+    def convert_history_to_api_format(self, messages: List[Message]) -> List[Dict[str, Any]]:
+        """
+        Convert Luna message history to Anthropic format.
+
+        Args:
+            messages: List of Luna Message objects
+
+        Returns:
+            List: Messages in Anthropic format
+        """
+        return [self.convert_message_to_api_format(msg) for msg in messages]
+
+    def convert_tool_schema(self, tool_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert a tool schema to Anthropic's format.
+
+        Anthropic's format matches our internal format, so this returns the schema unchanged.
+
+        Args:
+            tool_schema: The tool schema in Luna's format
+
+        Returns:
+            Dict: Tool schema in Anthropic format
+        """
+        return tool_schema
+
+    def format_tool_result(self, tool_response: ToolResponse) -> Dict[str, Any]:
+        """
+        Format a tool result for Anthropic's API.
+
+        Anthropic expects tool_result content to be a string or content blocks.
+
+        Args:
+            tool_response: The tool response from Luna's internal format
+
+        Returns:
+            Dict: Tool result in Anthropic format
+        """
+        content = tool_response.content
+
+        # Ensure content is a string or content blocks list
+        if not isinstance(content, str) and not isinstance(content, list):
+            # Convert to string using JSON if possible
+            try:
+                import json
+
+                content = json.dumps(content)
+            except:
+                # Fall back to string representation
+                content = str(content)
+
+        result = {"type": "tool_result", "tool_use_id": tool_response.tool_id, "content": content}
+
+        # Add is_error flag if needed
+        if tool_response.is_error:
+            result["is_error"] = True
+
+        return result

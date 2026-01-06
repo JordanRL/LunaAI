@@ -13,13 +13,16 @@ class AppConfig:
         elasticsearch_url: URL for Elasticsearch server
         show_agent_thinking: Whether to display agents' thinking processes
         logs_path: Path for application logs
+        persona: Which persona config to load
+        provider: Which LLM provider to use (anthropic, openai, gemini)
     """
 
-    default_model: str = "claude-3-7-sonnet-latest"
+    default_model: str = "claude-sonnet-4-5"
     elasticsearch_url: str = "http://localhost:9200"
     show_agent_thinking: bool = True
     logs_path: str = "logs"
     persona: str = "luna"
+    provider: str = "anthropic"
 
 
 @dataclass
@@ -29,10 +32,14 @@ class APIKeys:
 
     Attributes:
         anthropic_api_key: Anthropic API key
+        openai_api_key: OpenAI API key
+        gemini_api_key: Google Gemini API key
         openrouter_api_key: OpenRouter API key
     """
 
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
     openrouter_api_key: str = ""
 
 

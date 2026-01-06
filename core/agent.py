@@ -2,16 +2,14 @@
 Agent implementation for Luna.
 
 This module defines the agent implementation for Luna,
-aligned with Anthropic's SDK patterns.
+supporting multiple LLM providers through adapters.
 """
 
 import time
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Type, Union
 
-from anthropic.types import Message as AnthropicMessage
-
-from adapters.anthropic_adapter import AnthropicAdapter
+from adapters.base_adapter import BaseAdapter
 from domain.models.agent import AgentConfig, AgentResponse
 from domain.models.content import MessageContent
 from domain.models.conversation import Conversation
@@ -22,10 +20,10 @@ from services.prompt_service import PromptService
 
 class Agent:
     """
-    Agent implementation aligned with Anthropic SDK patterns.
+    Agent implementation for LLM integration.
 
     This Agent class supports:
-    - SDK-compatible message formatting
+    - Provider-agnostic message formatting
     - Multi-turn tool conversations
     - System prompts as separate parameters
     - Proper content block handling
@@ -34,7 +32,7 @@ class Agent:
     def __init__(
         self,
         config: AgentConfig,
-        api_adapter: AnthropicAdapter,
+        api_adapter: BaseAdapter,
         prompt_service: PromptService,
     ):
         """
@@ -42,7 +40,8 @@ class Agent:
 
         Args:
             config: Configuration for this agent
-            api_adapter: Adapter for API calls
+            api_adapter: Adapter for API calls (any LLM provider)
+            prompt_service: Service for prompt processing
         """
         self.config = config
         self.name = config.name

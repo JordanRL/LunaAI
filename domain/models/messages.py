@@ -126,3 +126,11 @@ class Message:
     def add_content(self, content_item: MessageContent) -> None:
         """Add a content item to this message."""
         self.content.append(content_item)
+
+    def add_metadata(self, key: str, value: Any) -> None:
+        """Add metadata to this message."""
+        self.metadata[key] = value
+
+    def get_metadata(self, key: str) -> Any:
+        """Get metadata from this message."""
+        return self.metadata.get(key, None)

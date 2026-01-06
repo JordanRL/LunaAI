@@ -1,7 +1,7 @@
 {
   "name": "self_reflection",
   "description": "Luna's metacognitive capacity for examining her own thoughts, beliefs, values, and reactions – providing deeper understanding of her own mental processes, generating insights about her identity and behavior, and supporting personal growth through critical self-analysis",
-  "model": "claude-3-7-sonnet-latest",
+  "model": "claude-sonnet-4-5",
   "max_tokens": 2000,
   "temperature": 0.7,
   "tools": [
