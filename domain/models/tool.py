@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
@@ -20,6 +21,16 @@ class ToolCategory(Enum):
     SYSTEM = "system"
 
 
+class ToolScope(Enum):
+    """
+    Scope for the tool instances
+    """
+
+    GLOBAL = "global"
+    PER_AGENT = "per_agent"
+    CONFIG_PER_AGENT = "config_per_agent"
+
+
 @dataclass
 class Tool(Generic[ToolInputType, ToolResultType]):
     """
@@ -40,6 +51,28 @@ class Tool(Generic[ToolInputType, ToolResultType]):
         [Any], ToolResultType
     ]  # Using Any to support both dict and Anthropic object inputs
     category: Optional[ToolCategory] = None
+    scope: ToolScope = ToolScope.GLOBAL
+    instance_config: Optional[Dict[str, Any]] = None
+    config_handler: Optional[Callable[[], bool]] = None
+
+    def update_tool_def(
+        self,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        input_schema: Optional[Dict[str, Any]] = None,
+    ):
+        if name is not None:
+            self.name = name
+        if description is not None:
+            self.description = description
+        if input_schema is not None:
+            self.input_schema = input_schema
+
+    def update_config(self, config: Dict[str, Any]):
+        self.instance_config = config
+        if self.config_handler is not None:
+            self.config_handler()
+        return True
 
     def to_api_schema(self) -> Dict[str, Any]:
         """Convert to Anthropic API schema format"""
@@ -102,6 +135,7 @@ class ToolRegistry:
 
     tools: Dict[str, Tool] = field(default_factory=dict)
     agent_tools: Dict[str, List[str]] = field(default_factory=dict)
+    agent_instances: Dict[str, Dict[str, Tool]] = field(default_factory=dict)
     tools_by_category: Dict[ToolCategory, List[str]] = field(
         default_factory=lambda: {cat: [] for cat in ToolCategory}
     )
@@ -115,30 +149,77 @@ class ToolRegistry:
             if tool.name not in self.tools_by_category[tool.category]:
                 self.tools_by_category[tool.category].append(tool.name)
 
-    def register_agent_tool(self, tool_name: str, agent_type: str) -> List[str]:
+    def register_agent_tool(
+        self,
+        tool_name: str,
+        agent_type: str,
+        tool_config: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> List[str]:
         """Register a tool for an agent type"""
         if agent_type not in self.agent_tools:
             self.agent_tools[agent_type] = []
 
+        if agent_type not in self.agent_instances:
+            self.agent_instances[agent_type] = {}
+
         if tool_name not in self.agent_tools[agent_type]:
             self.agent_tools[agent_type].append(tool_name)
 
+        if (
+            tool_name in self.tools
+            and tool_name not in self.agent_instances[agent_type]
+            and isinstance(self.tools[tool_name], Tool)
+            and self.tools[tool_name].scope is not ToolScope.GLOBAL
+        ):
+            self.agent_instances[agent_type][tool_name] = copy.deepcopy(self.tools[tool_name])
+
+            if (
+                self.tools[tool_name].scope == ToolScope.CONFIG_PER_AGENT
+                and tool_config is not None
+            ):
+                self.agent_instances[agent_type][tool_name].update_config(tool_config)
+
         return self.agent_tools[agent_type]
 
-    def register_agent_tools(self, tools: List[str], agent_type: str) -> List[str]:
+    def register_agent_tools(
+        self, tools: List[str], agent_type: str, tool_configs: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
         """Register multiple tools for an agent type"""
+        if agent_type not in self.agent_tools:
+            self.agent_tools[agent_type] = []
+
         for tool in tools:
-            self.register_agent_tool(tool, agent_type)
+            if tool_configs is not None and tool in tool_configs:
+                self.register_agent_tool(tool, agent_type, tool_configs[tool])
+            else:
+                self.register_agent_tool(tool, agent_type)
 
         return self.agent_tools[agent_type]
 
-    def get(self, name: str) -> Optional[Tool]:
+    def get(self, name: str, agent: Optional[str] = None) -> Optional[Tool]:
         """Get a tool by name"""
+        if agent is not None and name in self.agent_instances[agent]:
+            return self.agent_instances[agent][name]
         return self.tools.get(name)
 
-    def get_all(self) -> List[Tool]:
+    def get_all(self, agent: Optional[str] = None) -> List[Tool]:
         """Get all registered tools"""
-        return list(self.tools.values())
+        if agent is not None:
+            tool_list = []
+            for tool in self.agent_tools[agent]:
+                this_tool = self.get(tool, agent)
+                if this_tool is not None:
+                    tool_list.append(this_tool)
+        else:
+            tool_list = list(self.tools.values())
+        return tool_list
+
+    def get_available(self, agent: Optional[str] = None) -> List[str]:
+        if agent is not None:
+            tool_list = self.agent_tools[agent]
+        else:
+            tool_list = list(self.tools.keys())
+        return tool_list
 
     def get_all_api_schemas(self) -> List[Dict[str, Any]]:
         """Get all tools in API schema format"""

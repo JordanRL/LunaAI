@@ -319,7 +319,6 @@ for a longer period of time. Typically, the importance decays are a rate of
             handler=self.handle,
             category=ToolCategory.MEMORY,
         )
-        self.memory_service = memory_service
 
     def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         try:

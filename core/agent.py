@@ -34,6 +34,7 @@ class Agent:
         config: AgentConfig,
         api_adapter: BaseAdapter,
         prompt_service: PromptService,
+        persistent_token_replacements: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize the agent.
@@ -55,9 +56,19 @@ class Agent:
 
         self.prompt_service = prompt_service
 
+        self.persistent_token_replacements = persistent_token_replacements
+
     def reset_history(self) -> None:
         """Reset the message history for a new user interaction."""
         self.message_history = Conversation()
+
+    def get_config_value(self, key: str, default: Optional[Any] = None) -> Any:
+        return getattr(self.config, key, default)
+
+    def set_persistent_token_replacements(
+        self, persistent_token_replacements: Dict[str, str]
+    ) -> None:
+        self.persistent_token_replacements = persistent_token_replacements
 
     def execute(
         self,
@@ -96,9 +107,15 @@ class Agent:
         # Call the API adapter to execute the request
         if not token_replacements:
             token_replacements = {}
+
+        if self.persistent_token_replacements is None:
+            self.persistent_token_replacements = {}
+
         start_time = time.time()
         response = self.api_adapter.send_message(
-            system_prompt=self.prompt_service.compile_prompt(self.name.value, token_replacements),
+            system_prompt=self.prompt_service.compile_prompt(
+                self.name.value, token_replacements, self.persistent_token_replacements
+            ),
             message=message,
             history=history_copy,
             agent=self.config,

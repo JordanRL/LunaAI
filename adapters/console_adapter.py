@@ -336,8 +336,9 @@ class ConsoleAdapter:
         """
         # Format tool input in a way that ensures it's readable
         if isinstance(tool_input, dict) and len(tool_input) > 0:
-            # Use JSON formatting with indentation for better readability
-            formatted_input = JSON.from_data(tool_input, indent=2)
+            # Use Syntax with word_wrap=True for better readability of long strings
+            input_json = json.dumps(tool_input, indent=2, default=str)
+            formatted_input = Syntax(input_json, "json", theme="monokai", word_wrap=True)
         else:
             # Fall back to markdown for any non-dict or empty inputs
             input_json = json.dumps(tool_input, indent=2, default=str)
@@ -412,9 +413,11 @@ class ConsoleAdapter:
         else:
             # For success responses, use standard JSON formatting
             if isinstance(tool_output, dict):
-                formatted_output = JSON.from_data(tool_output, indent=2)
+                output_json = json.dumps(tool_output, indent=2, default=str)
+                formatted_output = Syntax(output_json, "json", theme="monokai", word_wrap=True)
             elif hasattr(tool_output, "to_dict"):
-                formatted_output = JSON.from_data(tool_output.to_dict(), indent=2)
+                output_json = json.dumps(tool_output.to_dict(), indent=2, default=str)
+                formatted_output = Syntax(output_json, "json", theme="monokai", word_wrap=True)
             panel_title = f"Tool Response: {tool_name}"
             panel_style = self.get_agent_style(target_agent)
 

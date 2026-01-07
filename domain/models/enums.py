@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 
 class WorkingMemoryType(Enum):
@@ -38,13 +38,16 @@ class AgentType(Enum):
         return [agent.value for agent in cls]
 
     @classmethod
-    def filtered_to_list(cls) -> List[str]:
+    def filtered_to_list(cls, allowed: Optional[List[str]] = None) -> List[str]:
         """
         Convert enum values to a list of strings, excluding some specific agents.
         This is useful for tools that should not route to certain agents.
         """
-        exclude = ["dispatcher", "outputter", "persona_evolution", "development_test"]
-        return [agent.value for agent in cls if agent.value not in exclude]
+        if allowed is None:
+            exclude = ["dispatcher", "outputter", "persona_evolution", "development_test"]
+            return [agent.value for agent in cls if agent.value not in exclude]
+        else:
+            return [agent.value for agent in cls if agent.value in allowed]
 
 
 class ContentType(Enum):

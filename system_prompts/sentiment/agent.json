@@ -1,6 +1,7 @@
 {
   "name": "sentiment",
   "description": "Analytical system that evaluates the emotional tone, intent, and underlying attitude in user messages – providing objective assessment of communication sentiment that helps Luna respond appropriately to subtle emotional cues",
+  "when_to_use": "When you are uncertain about the emotions being expressed by the user in their message",
   "model": "claude-haiku-4-5",
   "max_tokens": 2000,
   "temperature": 0.7,

@@ -75,10 +75,14 @@ class AgentConfig:
         name: Name of the agent
         model: Model to use
         system_prompt: System prompt to use
+        system_prompt_file: System prompt file to use
         tools: List of tools available to this agent
+        tool_configs: Tool configurations available to this agent
+        allowed_tools: Allowed tools available to this agent
+        description: Description of the agent
+        features: Features available to this agent
         max_tokens: Maximum tokens for this agent
         temperature: Temperature setting
-        features: Feature flags controlling what content is included in prompts
     """
 
     name: AgentType
@@ -86,8 +90,10 @@ class AgentConfig:
     system_prompt: Optional[str] = None
     system_prompt_file: Optional[str] = None
     tools: List[Tool] = field(default_factory=list)
+    tool_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     allowed_tools: List[str] = field(default_factory=list)
     description: Optional[str] = None
+    when_to_use: Optional[str] = None
     features: Dict[str, Any] = field(default_factory=dict)
     max_tokens: int = 4000
     temperature: float = 0.7

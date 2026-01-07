@@ -5,7 +5,7 @@ Routing tools for agent-to-agent communication.
 from typing import Any, Dict, List, Optional
 
 from domain.models.enums import AgentType
-from domain.models.tool import Tool, ToolCategory
+from domain.models.tool import Tool, ToolCategory, ToolScope
 
 
 class RouteToAgentTool(Tool):
@@ -42,7 +42,9 @@ Set await_response to true if you need information back from the agent.""",
                 "required": ["target_agent", "message"],
             },
             handler=self.handle,
+            config_handler=self.configure,
             category=ToolCategory.ROUTING,
+            scope=ToolScope.CONFIG_PER_AGENT,
         )
 
     def handle(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -52,7 +54,19 @@ Set await_response to true if you need information back from the agent.""",
         await_response = tool_input.get("await_response", False)
 
         # Validate target agent
-        if target_agent not in AgentType.filtered_to_list():
+        if (
+            self.instance_config is not None
+            and isinstance(self.instance_config, dict)
+            and "allowed_agents" in self.instance_config
+            and target_agent not in self.instance_config["allowed_agents"]
+        ):
+            error_msg = f"Invalid target agent: {target_agent}"
+            return {
+                "routing_success": False,
+                "error": error_msg,
+                "valid_agents": AgentType.filtered_to_list(self.instance_config["allowed_agents"]),
+            }
+        elif target_agent not in AgentType.filtered_to_list():
             error_msg = f"Invalid target agent: {target_agent}"
             return {
                 "routing_success": False,
@@ -66,6 +80,19 @@ Set await_response to true if you need information back from the agent.""",
             "await_response": await_response,
             "routing_success": True,
         }
+
+    def configure(self) -> bool:
+        if (
+            self.instance_config is not None
+            and isinstance(self.instance_config, dict)
+            and "allowed_agents" in self.instance_config
+        ):
+            new_schema = self.input_schema.copy()
+            new_schema["properties"]["target_agent"]["enum"] = AgentType.filtered_to_list(
+                self.instance_config["allowed_agents"]
+            )
+            self.update_tool_def(input_schema=new_schema)
+        return True
 
 
 class ContinueThinkingTool(Tool):

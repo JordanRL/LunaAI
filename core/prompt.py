@@ -285,10 +285,14 @@ class PromptTemplate:
                         template.add_node(current_path, item_tag, text=str(item))
             elif isinstance(value, str):
                 # Text content for the node
-                template.update_text(current_path, value)
+                if not template.update_text(current_path, value):
+                    # Create the node if it doesn't exist
+                    template.add_node(path, title_case_key, text=value)
             elif value is not None:
                 # Handle other types (numbers, booleans, etc.)
-                template.update_text(current_path, str(value))
+                if not template.update_text(current_path, str(value)):
+                    # Create the node if it doesn't exist
+                    template.add_node(path, title_case_key, text=str(value))
 
     def load_placeholder_file(self, placeholder_name: str, file_path: str) -> None:
         """Load a placeholder value from a file.

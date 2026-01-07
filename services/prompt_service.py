@@ -221,6 +221,7 @@ class PromptService:
         self,
         agent_name: str,
         replacements: Optional[Dict[str, Any]] = None,
+        token_replacements: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Compile a system prompt by replacing all dynamic content.
@@ -231,6 +232,7 @@ class PromptService:
         Args:
             agent_name: Name of the agent
             replacements: Optional dictionary of replacements (can use structure-based keys)
+            token_replacements: Optional dictionary of replacements that are string replaced in the compiled prompt
 
         Returns:
             Fully compiled system prompt
@@ -319,9 +321,13 @@ class PromptService:
                 # Apply structured replacements using apply_dict
                 compiled_template.apply_dict(structured_replacements)
 
-        return compiled_template.to_string()
+        prompt_string = compiled_template.to_string()
 
-    # Note: We've removed _apply_path_replacements since we now use apply_dict
+        if token_replacements:
+            for key, value in token_replacements.items():
+                prompt_string = prompt_string.replace(key, value)
+
+        return prompt_string
 
     def _process_feature_flags(self, template: PromptTemplate, features: Dict[str, Any]) -> None:
         """

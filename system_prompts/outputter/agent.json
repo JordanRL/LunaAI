@@ -1,6 +1,7 @@
 {
   "name": "outputter",
   "description": "Luna's communication interface that takes her internal thoughts, decisions, and emotional states and crafts them into natural, authentic responses that reflect her personality, current mood, and relationship with the user – translating her complex inner world into engaging, coherent external communication",
+  "when_to_use": "When you want to formulate the response, including voice and tone adjustments, of how you would express yourself verbally",
   "model": "claude-sonnet-4-5",
   "max_tokens": 2000,
   "temperature": 0.8,

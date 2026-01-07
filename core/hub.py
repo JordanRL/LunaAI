@@ -17,6 +17,7 @@ from adapters.console_adapter import ConsoleAdapter
 from config.settings import get_api_keys, get_app_config
 from core.agent import Agent
 from domain.models.agent import AgentResponse
+from domain.models.config import AppConfig
 from domain.models.content import MessageContent, ToolResponse
 from domain.models.enums import AgentType, ContentType, WorkingMemoryType
 from domain.models.memory import EpisodicMemoryQuery, MemoryQuery, WorkingMemory
@@ -41,6 +42,17 @@ class LunaHub:
     agents: Dict[str, Agent]
     tools: ToolRegistry
     execution_stats: Dict[str, Any]
+    user_id: str
+    console_adapter: ConsoleAdapter
+    conversation_service: ConversationService
+    emotion_service: EmotionService
+    prompt_service: PromptService
+    user_service: UserService
+    memory_service: MemoryService
+    persona_service: PersonaService
+    app_config: AppConfig
+    tools: ToolRegistry
+    agents: Dict[str, Agent]
 
     def __init__(
         self,
@@ -209,26 +221,31 @@ class LunaHub:
 
             # Get tools for this agent
             tool_names = agent_config_data.get("tools", [])
+            tool_configs = agent_config_data.get("tool_configs", None)
             tools = []
             allowed_tools = []
 
             # After loading tools in _load_tools, populate the tools list
-            if hasattr(self, "tools") and self.tools is not None:
-                for tool_name in tool_names:
-                    tool = self.tools.get(tool_name)
-                    if tool:
-                        allowed_tools.append(tool_name)
-                        tools.append(tool)
+            if (
+                hasattr(self, "tools")
+                and self.tools is not None
+                and isinstance(self.tools, ToolRegistry)
+            ):
+                self.tools.register_agent_tools(tool_names, agent_name, tool_configs)
+                tools = self.tools.get_all(agent_name)
+                allowed_tools = self.tools.get_available(agent_name)
 
             # Create AgentConfig
             agent_config = AgentConfig(
                 name=AgentType(agent_name),
                 model=agent_config_data.get("model", "claude-sonnet-4-5"),
                 tools=tools,
+                tool_configs=tool_configs,
                 allowed_tools=allowed_tools,
                 max_tokens=agent_config_data.get("max_tokens", 4000),
                 temperature=agent_config_data.get("temperature", 0.7),
                 description=agent_config_data.get("description", None),
+                when_to_use=agent_config_data.get("when_to_use", None),
                 features=agent_config_data["features"],
             )
 
@@ -247,6 +264,44 @@ class LunaHub:
 
             # Store in agents dictionary
             self.agents[agent_name] = agent
+
+        for post_process_agent in self.agents.values():
+            if post_process_agent.get_config_value(
+                "allowed_tools"
+            ) is not None and "route_to_agent" in post_process_agent.get_config_value(
+                "allowed_tools"
+            ):
+                allowed_agents = post_process_agent.get_config_value("tool_configs")[
+                    "route_to_agent"
+                ]["allowed_agents"]
+
+                routing_agent_desc = ""
+                routing_agent_when = ""
+
+                for allowed_agent in allowed_agents:
+                    if allowed_agent in self.agents:
+                        routing_agent_desc += (
+                            allowed_agent
+                            + ": "
+                            + self.agents[allowed_agent].get_config_value("description", "")
+                            + "\n"
+                        )
+                        routing_agent_when += (
+                            allowed_agent
+                            + ": "
+                            + self.agents[allowed_agent].get_config_value("when_to_use", "")
+                            + "\n"
+                        )
+
+                routing_agent_repl = {
+                    "{AGENT_DESCRIPTIONS}": routing_agent_desc,
+                    "{AGENT_WHEN}": routing_agent_when,
+                }
+
+                if post_process_agent.persistent_token_replacements is not None:
+                    routing_agent_repl.update(post_process_agent.persistent_token_replacements)
+
+                post_process_agent.set_persistent_token_replacements(routing_agent_repl)
 
     def _load_tools(self) -> None:
         """
